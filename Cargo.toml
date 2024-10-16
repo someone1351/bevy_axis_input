@@ -1,0 +1,9 @@
+[package]
+name = "bevy_some_input_map"
+version = "0.1.0"
+edition = "2021"
+
+[dependencies]
+bevy = { version = "0.14.2", features = ["serialize","file_watcher"] } #,"dynamic_linking"
+serde = { version = "1.0.204", features = ["derive"] }
+ron = "0.8.1"
