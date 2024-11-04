@@ -1,1 +1,1 @@
-# bevy_some_input_map
+# bevy chair input map
