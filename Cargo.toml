@@ -1,5 +1,5 @@
 [package]
-name = "bevy_some_input_map"
+name = "bevy_chair_input_map"
 version = "0.1.1"
 edition = "2021"
 
