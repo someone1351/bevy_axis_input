@@ -1,6 +1,6 @@
 
 use bevy::prelude::*;
-use bevy_some_input_map::{self as input_map, Binding, SetMappingBind, SetMappingRepeat};
+use bevy_chair_input_map::{self as input_map, Binding, SetMappingBind, SetMappingRepeat};
 use serde::Deserialize;
 
 #[derive(Clone,Debug,Deserialize,Hash,PartialEq,Eq,Ord,PartialOrd)]

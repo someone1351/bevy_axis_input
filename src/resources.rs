@@ -63,6 +63,7 @@ where
         // J :std::borrow::Borrow<Device>,
 
         I: IntoIterator<Item = Device>, 
+        // I:FromIterator<Device>,
     {
         let player_devices=self.player_devices.entry(PlayerId(player)).or_default();
         player_devices.clear();
