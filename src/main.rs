@@ -104,10 +104,10 @@ fn setup_input(
         Binding::Key(KeyCode::Enter),
 
         //so it uses GamepadAxisPos, GamepadAxisNeg instead
-        Binding::GamepadAxis(GamepadAxisType::LeftStickX),
-        Binding::GamepadAxis(GamepadAxisType::LeftStickY),
-        Binding::GamepadAxis(GamepadAxisType::RightStickX),
-        Binding::GamepadAxis(GamepadAxisType::RightStickY),
+        Binding::GamepadAxis(GamepadAxis::LeftStickX),
+        Binding::GamepadAxis(GamepadAxis::LeftStickY),
+        Binding::GamepadAxis(GamepadAxis::RightStickX),
+        Binding::GamepadAxis(GamepadAxis::RightStickY),
     ]);
 
     input_map.set_player_mapping_binds(0, mapping_binds.get_items());
@@ -122,6 +122,12 @@ fn update_input(
 ) {
     for ev in input_map_event.read() {
         match ev.clone() {
+            input_map::InputMapEvent::GamepadConnect { entity, index, name, vendor_id, product_id } => {
+                println!("Gamepad connected: {entity} {index} {name:?} {vendor_id:?} {product_id:?}");
+            }
+            input_map::InputMapEvent::GamepadDisconnect { entity, index, name, vendor_id, product_id } => {
+                println!("Gamepad disconnected: {entity} {index} {name:?} {vendor_id:?} {product_id:?}");
+            }
             input_map::InputMapEvent::ValueChanged { mapping:Mapping::X, val, .. } => {
                 menu.x_val=val;
             }
@@ -132,8 +138,9 @@ fn update_input(
                 exit.send(AppExit::Success); 
             }
             input_map::InputMapEvent::JustPressed{mapping:Mapping::MenuUp, dir, ..}
-            |input_map::InputMapEvent::Repeat { mapping:Mapping::MenuUp, dir, .. } if !menu.in_bind_mode => 
-            {
+                |input_map::InputMapEvent::Repeat { mapping:Mapping::MenuUp, dir, .. } 
+                if !menu.in_bind_mode 
+            => {
                 menu.cur_index-=dir;
                 let n= 4;
                 if menu.cur_index<0 {menu.cur_index=n-1;}
@@ -211,65 +218,174 @@ fn update_input(
 
 fn setup_camera(mut commands: Commands) {
     // commands.spawn(( Camera2dBundle { camera: Camera { ..default() }, ..default() }, ));
-    commands.spawn((Camera3dBundle { camera: Camera { ..default() }, ..default() },));
+    // commands.spawn((Camera2d,));
+    commands.spawn(Camera3d::default());
 }
 
 #[derive(Component)]
-struct MenuMarker;
+struct MenuItem(i32);
 
 fn setup_menu(
     mut commands: Commands, 
-) {
-    let text_bundle=TextBundle::from_section("", Default::default());
-    let style=Style{align_self:AlignSelf::Center,justify_self:JustifySelf::Center,..Default::default()};
-    commands.spawn(text_bundle.with_style(style)).insert(MenuMarker);
-}
-
-fn show_menu(
-    mut marker_query: Query<&mut Text, With<MenuMarker>>,
-    menu : Res<Menu>,
-    mapping_binds : Res<MappingBinds>,
     asset_server: Res<AssetServer>,
 ) {
     let font = asset_server.load("FiraMono-Medium.ttf");
-    let text_style = TextStyle{ font, font_size:25.0, color: Color::WHITE };
+    // // let text_bundle=TextBundle::from_section("", Default::default());
+    // // let style=Style{align_self:AlignSelf::Center,justify_self:JustifySelf::Center,..Default::default()};
+    // // commands.spawn(text_bundle.with_style(style)).insert(MenuMarker);
+
+    // commands.spawn((
+    //     Text::new("hello\nbevy!"),
+    //     TextFont {
+    //         font: asset_server.load("FiraMono-Medium.ttf"),
+    //         font_size: 25.0,
+    //         ..default()
+    //     },
+    //     TextLayout::new_with_justify(JustifyText::Center),
+    //     Node {
+    //         position_type: PositionType::Absolute,
+    //         bottom: Val::Px(5.0),
+    //         right: Val::Px(5.0),
+    //         ..default()
+    //     },
+    //     MenuMarker,
+    // ));
+    commands.spawn((
+        Text::default(),
+        TextLayout::new_with_justify(JustifyText::Center),
+        Node {align_self:AlignSelf::Center,justify_self:JustifySelf::Center,..Default::default()},
+    )).with_child((
+        TextSpan::new("\"Press Up/Down to navigate, Enter to select, Escape to cancel/clear binding.\""),
+        TextColor::from(bevy::color::palettes::css::WHITE),
+        TextFont {font:font.clone(),font_size: 15.0,..default()},
+    )).with_child((
+        TextSpan::new("\n\n"),
+        TextFont {font:font.clone(),font_size: 25.0,..default()},
+    )).with_child((
+    )).with_child((
+        MenuItem(-1),
+        TextSpan::new("values"),
+        TextColor::from(bevy::color::palettes::css::WHITE),
+        TextFont {font:font.clone(),font_size: 25.0,..default()},
+    )).with_child((
+        TextSpan::new("\n"),
+        TextFont {font:font.clone(),font_size: 25.0,..default()},
+    )).with_child((
+        MenuItem(0),
+        TextSpan::new("b\n"),
+        TextColor::from(bevy::color::palettes::css::WHITE),
+        TextFont {font:font.clone(),font_size: 25.0,..default()},
+    )).with_child((
+        MenuItem(1),
+        TextSpan::new("b\n"),
+        TextColor::from(bevy::color::palettes::css::WHITE),
+        TextFont {font:font.clone(),font_size: 25.0,..default()},
+    )).with_child((
+        MenuItem(2),
+        TextSpan::new("b\n"),
+        TextColor::from(bevy::color::palettes::css::WHITE),
+        TextFont {font:font.clone(),font_size: 25.0,..default()},
+    )).with_child((
+        MenuItem(3),
+        TextSpan::new("Exit"),
+        TextColor::from(bevy::color::palettes::css::WHITE),
+        TextFont {font:font.clone(),font_size: 25.0,..default()},
+    ));
+}
+
+fn show_menu(
+    mut marker_query: Query<(&MenuItem, &mut TextSpan, &mut TextColor)>,
+    menu : Res<Menu>,
+    mapping_binds : Res<MappingBinds>,
+) {
+    // let text_style = TextFont{ font, font_size:25.0 , ..Default::default()}; //, color: Color::WHITE
     
-    if let Ok(mut text)=marker_query.get_single_mut() {
-        text.sections.clear();
-        
-        text.justify =JustifyText::Center;
-        text.sections.push(TextSection { value: "\"Press Up/Down to navigate, Enter to select, Escape to cancel/clear binding.\"\n".to_string(), style: TextStyle{font_size:20.0, ..text_style.clone()} }); //0
-        text.sections.push(TextSection { value: "\n".to_string(), style: text_style.clone()}); //1
-        text.sections.push(TextSection { value: format!("\"X={:.3}, Y={:.3}\"\n",menu.x_val,menu.y_val), style: TextStyle{font_size:20.0, ..text_style.clone()} }); //02
-        text.sections.push(TextSection { value: "\n".to_string(), style: text_style.clone()}); //3
+    for (item,mut text,mut col) in marker_query.iter_mut() {
 
-        text.sections.push(TextSection { 
-            value: format!("Rebind X+ : {:?}\n",
-                if menu.in_bind_mode&&menu.cur_index==0 {"...".to_string()}else{mapping_binds.x_pos.bindings.first().map(|x|format!("{x:?}")).unwrap_or_default()}
-            ), 
-            style: text_style.clone()}
-        );
-        
-        text.sections.push(TextSection { 
-            value: format!("Rebind X- : {:?}\n",
-                if menu.in_bind_mode&&menu.cur_index==1 {"...".to_string()}else{mapping_binds.x_neg.bindings.first().map(|x|format!("{x:?}")).unwrap_or_default()}
-            ), 
-            style: text_style.clone()}
-        );
-
-        text.sections.push(TextSection { 
-            value: format!("Rebind Y : {:?}\n",
-                if menu.in_bind_mode&&menu.cur_index==2 {"...".to_string()}else{mapping_binds.y.bindings.first().map(|x|format!("{x:?}")).unwrap_or_default()}
-            ), 
-            style: text_style.clone()}
-        );
-
-        text.sections.push(TextSection { value: "Exit\n".to_string(), style: text_style.clone()});
-
-        text.sections[(menu.cur_index as usize)+4].style.color=Color::linear_rgb(1.0, 0.0, 0.0);
+        if item.0==menu.cur_index {
+            col.0=Color::linear_rgb(1.0, 0.0, 0.0);
+        } else {
+            col.0=Color::linear_rgb(1.0,1.0,1.0);
+        }
 
         if let Some(i)=menu.pressed {
-            text.sections[(i as usize)+4].style.color=Color::linear_rgb(0.8, 0.8, 0.0);
+            if item.0==i {
+                col.0=Color::linear_rgb(0.8, 0.8, 0.0);
+            } else {
+                col.0=Color::linear_rgb(1.0,1.0,1.0);
+            }
+        }
+        
+        match item.0 {
+            -1 => {
+                text.0=format!("\"X={:.3}, Y={:.3}\"\n",menu.x_val,menu.y_val);
+            }
+            0 => {
+                text.0=format!("Rebind X+ : {:?}\n",
+                    if menu.in_bind_mode&&menu.cur_index==0 {
+                        "...".to_string()
+                    }else{
+                        mapping_binds.x_pos.bindings.first().map(|x|format!("{x:?}")).unwrap_or_default()
+                    }
+                );
+            }
+            1 => {
+                text.0=format!("Rebind X- : {:?}\n",
+                    if menu.in_bind_mode&&menu.cur_index==1 {
+                        "...".to_string()
+                    }else{
+                        mapping_binds.x_neg.bindings.first().map(|x|format!("{x:?}")).unwrap_or_default()
+                    }
+                ); 
+            }
+            2 => {
+                text.0=format!("Rebind Y : {:?}\n",
+                    if menu.in_bind_mode&&menu.cur_index==2 {
+                        "...".to_string()
+                    }else{
+                        mapping_binds.y.bindings.first().map(|x|format!("{x:?}")).unwrap_or_default()
+                    }
+                );
+            }
+            _ => {}
         }
     }
+    // if let Ok(mut text)=marker_query.get_single_mut() {
+    //     text.sections.clear();
+        
+    //     text.justify =JustifyText::Center;
+    //     text.sections.push(TextSection { value: "\"Press Up/Down to navigate, Enter to select, Escape to cancel/clear binding.\"\n".to_string(), style: TextStyle{font_size:20.0, ..text_style.clone()} }); //0
+    //     text.sections.push(TextSection { value: "\n".to_string(), style: text_style.clone()}); //1
+    //     text.sections.push(TextSection { value: format!("\"X={:.3}, Y={:.3}\"\n",menu.x_val,menu.y_val), style: TextStyle{font_size:20.0, ..text_style.clone()} }); //02
+    //     text.sections.push(TextSection { value: "\n".to_string(), style: text_style.clone()}); //3
+
+    //     text.sections.push(TextSection { 
+    //         value: format!("Rebind X+ : {:?}\n",
+    //             if menu.in_bind_mode&&menu.cur_index==0 {"...".to_string()}else{mapping_binds.x_pos.bindings.first().map(|x|format!("{x:?}")).unwrap_or_default()}
+    //         ), 
+    //         style: text_style.clone()}
+    //     );
+        
+    //     text.sections.push(TextSection { 
+    //         value: format!("Rebind X- : {:?}\n",
+    //             if menu.in_bind_mode&&menu.cur_index==1 {"...".to_string()}else{mapping_binds.x_neg.bindings.first().map(|x|format!("{x:?}")).unwrap_or_default()}
+    //         ), 
+    //         style: text_style.clone()}
+    //     );
+
+    //     text.sections.push(TextSection { 
+    //         value: format!("Rebind Y : {:?}\n",
+    //             if menu.in_bind_mode&&menu.cur_index==2 {"...".to_string()}else{mapping_binds.y.bindings.first().map(|x|format!("{x:?}")).unwrap_or_default()}
+    //         ), 
+    //         style: text_style.clone()}
+    //     );
+
+    //     text.sections.push(TextSection { value: "Exit\n".to_string(), style: text_style.clone()});
+
+    //     text.sections[(menu.cur_index as usize)+4].style.color=Color::linear_rgb(1.0, 0.0, 0.0);
+
+    //     if let Some(i)=menu.pressed {
+    //         text.sections[(i as usize)+4].style.color=Color::linear_rgb(0.8, 0.8, 0.0);
+    //     }
+    // }
 }

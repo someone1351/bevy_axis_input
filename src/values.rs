@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use bevy::prelude::{GamepadAxisType, GamepadButtonType, KeyCode, MouseButton};
+use bevy::prelude::{ GamepadAxis, GamepadButton, KeyCode, MouseButton};
 
 use serde::Deserialize;
 
@@ -110,14 +110,14 @@ pub enum Binding {
     MouseScrollLineNegY,
 
     
-    GamepadAxisPos(GamepadAxisType),
-    GamepadAxisNeg(GamepadAxisType),
+    GamepadAxisPos(GamepadAxis),
+    GamepadAxisNeg(GamepadAxis),
 
-    GamepadAxis(GamepadAxisType),
+    GamepadAxis(GamepadAxis),
     MouseButton(MouseButton),
     Key(KeyCode),
     // ModifierKey(Vec<KeyCode>),
-    GamepadButton(GamepadButtonType),
+    GamepadButton(GamepadButton),
 }
 
 impl std::str::FromStr for Binding {

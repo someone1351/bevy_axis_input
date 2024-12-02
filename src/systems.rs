@@ -1,15 +1,15 @@
 
-use std::{collections::{HashMap, HashSet}, hash::Hash};
+use std::{collections::{HashMap, HashSet}, fmt::Debug, hash::Hash};
 
-use bevy::ecs::prelude::*;
-use bevy::input::gamepad::{GamepadAxisChangedEvent, GamepadButtonChangedEvent, GamepadConnection, GamepadConnectionEvent, GamepadEvent,GamepadAxisType};
+use bevy::{ecs::prelude::*, prelude::GamepadAxis};
+use bevy::input::gamepad::{GamepadAxisChangedEvent, GamepadButtonChangedEvent, GamepadConnection, GamepadConnectionEvent, GamepadEvent,};
 use bevy::input::keyboard::KeyCode;
 
 use super::resources::*;
 use super::events::*;
 use super::values::*;
 
-pub fn binding_inputs_system<M: Send + Sync + 'static + Eq> 
+pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug> 
 (
     mut gamepad_events: EventReader<GamepadEvent>, 
     mut key_events: EventReader<bevy::input::keyboard::KeyboardInput>,
@@ -17,26 +17,60 @@ pub fn binding_inputs_system<M: Send + Sync + 'static + Eq>
     mut mouse_scroll_events: EventReader<bevy::input::mouse::MouseWheel>, 
     mut mouse_button_events : EventReader<bevy::input::mouse::MouseButtonInput>, 
 
-    input_map : Res<InputMap<M>>,
+    mut input_map : ResMut<InputMap<M>>,
     
-    mut gamepad_axis_lasts : Local<HashMap<(Device,GamepadAxisType),f32>>,
+    mut gamepad_axis_lasts : Local<HashMap<(Device,GamepadAxis),f32>>,
     mut key_lasts : Local<HashSet<KeyCode>>,
 
     mut binding_input_event_writer: EventWriter<BindingInputEvent>,
+    mut mapping_event_writer: EventWriter<InputMapEvent<M>>,
 ) {
     //
     for event in gamepad_events.read() {
         let immediate=false;
 
         match event {
-            GamepadEvent::Connection(GamepadConnectionEvent{gamepad,connection:GamepadConnection::Connected(gamepad_info)})=> {
-                println!("{:?} {:?} Connected", gamepad,gamepad_info);
+            GamepadEvent::Connection(GamepadConnectionEvent{gamepad,connection:GamepadConnection::Connected { 
+                name, vendor_id, product_id  
+            }})=> {
+                //println!("{gamepad} {name:?} Connected", );
+                
+                let mut device_index=None;
+
+                for (i,x) in input_map.gamepad_devices.iter().enumerate() {
+                    if x.is_none() {
+                        device_index=Some(i);
+                    }
+                }
+
+                if device_index.is_none() {
+                    device_index=Some(input_map.gamepad_devices.len());
+                    input_map.gamepad_devices.push(None);
+                }
+
+                *input_map.gamepad_devices.get_mut(device_index.unwrap()).unwrap()=Some((*gamepad,name.clone(),*vendor_id,*product_id));
+                input_map.gamepad_device_entity_map.insert(*gamepad, device_index.unwrap());
+
+                //
+                
+
+                mapping_event_writer.send(InputMapEvent::GamepadConnect{entity:*gamepad,index:device_index.unwrap(),name:name.clone(),vendor_id:*vendor_id, product_id:*product_id});
+
             }
             GamepadEvent::Connection(GamepadConnectionEvent{gamepad,connection:GamepadConnection::Disconnected})=> {
-                println!("{:?} Disconnected", gamepad);
+                //println!("{:?} Disconnected", gamepad);
+
+                let &index=input_map.gamepad_device_entity_map.get(gamepad).unwrap();
+                let (_,name,vendor_id,product_id) = input_map.gamepad_devices.get(index).cloned().unwrap().unwrap();
+
+                mapping_event_writer.send(InputMapEvent::GamepadDisconnect{entity:*gamepad,index,name,vendor_id, product_id});
+
+                // let i =input_map.gamepad_device_entity_map.remove(gamepad).unwrap();
+                // *input_map.gamepad_devices.get_mut(i).unwrap()=None;
+                //removal is done in system below
             }
-            GamepadEvent::Button(GamepadButtonChangedEvent {gamepad,button_type,value,})=> {
-                let device=Device::Gamepad(gamepad.id);
+            GamepadEvent::Button(GamepadButtonChangedEvent {value, entity, button:button_type, .. })=> {
+                let device=Device::Gamepad(input_map.gamepad_device_entity_map.get(entity).cloned().unwrap());
                 let binding=Binding::GamepadButton(*button_type);
 
                 let dead_zone=input_map.device_dead_zones.get(&device).and_then(|x|x.get(&binding)).cloned().unwrap_or_default();
@@ -46,9 +80,9 @@ pub fn binding_inputs_system<M: Send + Sync + 'static + Eq>
 
                 binding_input_event_writer.send(BindingInputEvent { device, immediate, binding, value, });
             }
-            GamepadEvent::Axis(GamepadAxisChangedEvent {gamepad,axis_type,value})=> {
+            GamepadEvent::Axis(GamepadAxisChangedEvent {value, entity, axis:axis_type })=> {
                 let axis_type=*axis_type;
-                let device=Device::Gamepad(gamepad.id);
+                let device=Device::Gamepad(input_map.gamepad_device_entity_map.get(entity).cloned().unwrap());
                 let binding=Binding::GamepadAxis(axis_type);
                         
                 let dead_zone=input_map.device_dead_zones.get(&device).and_then(|x|x.get(&binding)).cloned().unwrap_or_default();
@@ -291,8 +325,15 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
             continue;
         };
 
-        let gamepad_device=Device::Gamepad(gamepad.id);
+        let gamepad_device=Device::Gamepad(input_map.gamepad_device_entity_map.get(gamepad).cloned().unwrap());
 
+        //
+        {
+            let i =input_map.gamepad_device_entity_map.remove(gamepad).unwrap();
+            *input_map.gamepad_devices.get_mut(i).unwrap()=None;
+        }
+
+        //
         let Some(players)=device_players.get(&gamepad_device) else {
             continue;
         };
@@ -731,7 +772,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
             //
             if mapping_val.repeating {
                 let duration=repeat_time/cur_val.abs();
-                mapping_val.repeat_time_accum+=time.delta_seconds();
+                mapping_val.repeat_time_accum+=time.delta_secs(); 
 
                 if mapping_val.repeat_time_accum>=duration {
                     mapping_event_writer.send(InputMapEvent::Repeat { mapping: mapping.clone(), dir: cur_dir, delay: duration, player: player.0 });

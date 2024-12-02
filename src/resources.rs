@@ -2,6 +2,7 @@
 use std::collections::{ HashMap, HashSet};
 use std::fmt::Debug;
 use bevy::ecs::system::Resource;
+use bevy::prelude::Entity;
 // use bevy::prelude::IntoSystem;
 
 use super::values::*;
@@ -25,6 +26,11 @@ pub struct InputMap<M:Eq> {
     pub(super) player_bind_mode_bindings:HashMap<PlayerId,HashSet<(Device,Binding)>>,
     pub(super) bind_mode_dead_start:f32,
     pub(super) bind_mode_dead_end:f32,
+
+    //
+    
+    pub(super) gamepad_devices:Vec<Option<(Entity,String,Option<u16>,Option<u16>)>>,
+    pub(super) gamepad_device_entity_map:HashMap<Entity,usize>,
 }
 
 impl<M:Eq> Default for InputMap<M> {
@@ -42,6 +48,8 @@ impl<M:Eq> Default for InputMap<M> {
             bind_mode_dead_start:0.4,
             bind_mode_dead_end:0.2,
             bind_mode_excludes:HashSet::new(),
+            gamepad_devices:Vec::new(),
+            gamepad_device_entity_map:HashMap::new(),
         }
     }
 }
