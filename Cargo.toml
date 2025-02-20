@@ -1,9 +1,20 @@
 [package]
-name = "bevy_chair_input_map"
+name = "bevy_axis_input"
 version = "0.1.1"
 edition = "2021"
 
 [dependencies]
-bevy = { version = "0.15.0", features = ["serialize","file_watcher","dynamic_linking"] } #
-serde = { version = "1.0.204", features = ["derive"] }
+bevy = { version = "0.15.0", default-features = false, features = [ "serialize", ] }
+serde = { version = "1.0", features = ["derive"] }
 ron = "0.8.1"
+
+[dev-dependencies]
+bevy = { version = "0.15.0", default-features = false, features = ["bevy_ui","bevy_window","x11"] }
+
+[lib]
+name = "bevy_axis_input"
+path = "src/lib.rs"
+
+[[example]]
+name = "test"
+path = "examples/test.rs"

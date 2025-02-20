@@ -1,1 +1,1 @@
-# bevy chair input map
+# bevy axis input

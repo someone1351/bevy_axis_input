@@ -20,7 +20,7 @@ impl<M> Default for InputMapPlugin<M> {
     }
 }
 
-impl<M> bevy::app::Plugin for InputMapPlugin<M> 
+impl<M> bevy::app::Plugin for InputMapPlugin<M>
 where
     InputMap<M>: Default,
     M: std::hash::Hash + Eq + std::fmt::Debug + Clone + Send + Sync,
@@ -30,7 +30,7 @@ where
             .init_resource::<InputMap<M>>()
             .add_event::<InputMapEvent<M>>()
             .add_event::<BindingInputEvent>()
-            
+
             .add_systems(bevy::app::PreUpdate, (
                 binding_inputs_system::<M>,
                 mapping_event_system::<M>,

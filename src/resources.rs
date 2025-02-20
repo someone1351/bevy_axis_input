@@ -28,7 +28,7 @@ pub struct InputMap<M:Eq> {
     pub(super) bind_mode_dead_end:f32,
 
     //
-    
+
     pub(super) gamepad_devices:Vec<Option<(Entity,String,Option<u16>,Option<u16>)>>,
     pub(super) gamepad_device_entity_map:HashMap<Entity,usize>,
 }
@@ -62,15 +62,15 @@ impl<M> InputMap<M>
 where
     M: std::hash::Hash + Eq + Clone + Send + Sync+Debug, //+Ord
 {
-    
+
     pub fn set_player_devices<I> //<I,J>
         (&mut self,player:i32,devices:I) //[device]
     where
         // I:AsRef<[Device]>
-        // I: IntoIterator<Item = J>, 
+        // I: IntoIterator<Item = J>,
         // J :std::borrow::Borrow<Device>,
 
-        I: IntoIterator<Item = Device>, 
+        I: IntoIterator<Item = Device>,
         // I:FromIterator<Device>,
     {
         let player_devices=self.player_devices.entry(PlayerId(player)).or_default();
@@ -89,24 +89,24 @@ where
         (&mut self,bindings:I) //[binding]
     where
         // I:AsRef<[Binding]>
-        // I: IntoIterator<Item = J>, 
+        // I: IntoIterator<Item = J>,
         // J :std::borrow::Borrow<Binding>,
         // // J :AsRef<Binding>,
 
-        I: IntoIterator<Item = Binding>, 
+        I: IntoIterator<Item = Binding>,
     {
         self.bind_mode_excludes.clear();
         // self.bind_mode_excludes.extend(bindings.as_ref().into_iter().map(|x|x.clone()));
         self.bind_mode_excludes.extend(bindings.into_iter());
-        
+
         // println!("hmm {:?}",self.bind_mode_excludes);
     }
 
     pub fn set_player_bind_mode_devices<I> //<I,J>
-        (&mut self,player:i32,devices:I) 
+        (&mut self,player:i32,devices:I)
     where
         // I:AsRef<[Device]>
-        // I: IntoIterator<Item = J>, 
+        // I: IntoIterator<Item = J>,
         // J :std::borrow::Borrow<Device>,
         // J :std::ops::Deref<Target = Device>,
         // J :AsRef< Device>,
@@ -128,10 +128,10 @@ where
     where
         // // I:AsRef<[(M,Vec<Binding>,f32,f32,f32)]>
         // for<'a> &'a I: IntoIterator<Item = &'a MappingBind<M>>,
-        // // I: IntoIterator<Item = J>, 
+        // // I: IntoIterator<Item = J>,
         // // J :std::borrow::Borrow<(M,Vec<Binding>,f32,f32,f32)>,
 
-        // I: IntoIterator<Item = (M,Vec<Binding>,f32,f32,f32)>, 
+        // I: IntoIterator<Item = (M,Vec<Binding>,f32,f32,f32)>,
         I: IntoIterator<Item = SetMappingBind<M>>,
     {
         let player=PlayerId(player);
@@ -140,7 +140,7 @@ where
 
         //collect input in temp mappings
         // for (mapping,bindings,scale,primary_dead,modifier_dead) in mappings.into_iter()
-        for SetMappingBind{ mapping, bindings, scale, primary_dead, modifier_dead } in mappings.into_iter() 
+        for SetMappingBind{ mapping, bindings, scale, primary_dead, modifier_dead } in mappings.into_iter()
         {
             // let (mapping,bindings,scale,primary_dead,modifier_dead)=x; //x.borrow().clone();
 
@@ -158,7 +158,7 @@ where
         }
 
         //setup primary binding mappings
-        {                
+        {
             let binding_mappings=self.player_binding_mappings.entry(player).or_default();
             binding_mappings.clear();
 
@@ -171,7 +171,7 @@ where
         }
 
         //setup modifier binding mappings
-        {                
+        {
             let modifier_mappings=self.player_modifier_mappings.entry(player).or_default();
             modifier_mappings.clear();
 
@@ -196,14 +196,14 @@ where
             //add new mappings/binding_infos or replace bindings in player_mapping from temp
             for (mapping,temp_bindings) in temp_player_mappings {
                 let mapping_val=mappings.entry(mapping).or_default();
-                
+
                 //remove any cur binding valss that are no longer used
                 for k in mapping_val.binding_vals.keys().cloned().collect::<Vec<_>>() {
                     if !temp_bindings.contains_key(&k.1) {
                         mapping_val.binding_vals.remove(&k).unwrap();
                     }
                 }
-                
+
                 //
                 mapping_val.binding_infos=temp_bindings;
             }
@@ -216,21 +216,21 @@ where
         // // I:AsRef<[(Binding,f32,f32)]>
         // // J :std::borrow::Borrow<(Binding,f32,f32)>,
 
-        // I: IntoIterator<Item = (Binding,f32,f32)>, 
-        I: IntoIterator<Item = SetBindingDead>, 
-    {        
+        // I: IntoIterator<Item = (Binding,f32,f32)>,
+        I: IntoIterator<Item = SetBindingDead>,
+    {
         //axis:GamepadAxisType GamepadButtonType gamepad_id:usize
         //should only need to do for gamepad axises
-        // but for some reason the GamepadAxisType::LeftZ, GamepadAxisType::RightZ do nothing 
+        // but for some reason the GamepadAxisType::LeftZ, GamepadAxisType::RightZ do nothing
         // and the GamepadButtonType::LeftTrigger, GamepadButtonType::RightTrigger are used for the axis values
-    
+
         let device_deads=self.device_dead_zones.entry(device).or_default();
         device_deads.clear();
 
         // device_deads.extend(binding_deads.as_ref().iter().map(|&(binding,neg,pos)|(binding,InputBindingDeadZone {neg,pos})));
         // device_deads.extend(binding_deads.into_iter().map(|(binding,neg,pos)|(binding,InputBindingDeadZone {neg,pos})));
         device_deads.extend(binding_deads.into_iter().map(|x|(x.binding,InputBindingDeadZone {neg:x.neg,pos:x.pos})));
-        
+
     //     device_deads.extend(binding_deads.into_iter()
     //         .map(|x|x.borrow().clone())
     //         .map(|(binding,neg,pos)|(binding,InputBindingDeadZone {neg,pos}))
@@ -241,11 +241,11 @@ where
         (&mut self, mapping_repeats:I) //[(mapping,repeat)]
     where
         // // I:AsRef<[(M,f32)]>,
-        // // I: IntoIterator<Item = J>, 
+        // // I: IntoIterator<Item = J>,
         // // J :std::borrow::Borrow<(M,f32)>,
 
-        // I: IntoIterator<Item = (M,f32)>, 
-        I: IntoIterator<Item = SetMappingRepeat<M>>, 
+        // I: IntoIterator<Item = (M,f32)>,
+        I: IntoIterator<Item = SetMappingRepeat<M>>,
     {
         self.mapping_repeats.clear();
         // self.mapping_repeats.extend(mapping_repeats.as_ref().iter().map(|x|x.clone()));

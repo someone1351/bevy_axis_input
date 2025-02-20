@@ -9,16 +9,16 @@ use super::resources::*;
 use super::events::*;
 use super::values::*;
 
-pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug> 
+pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug>
 (
-    mut gamepad_events: EventReader<GamepadEvent>, 
+    mut gamepad_events: EventReader<GamepadEvent>,
     mut key_events: EventReader<bevy::input::keyboard::KeyboardInput>,
-    mut mouse_move_events: EventReader<bevy::input::mouse::MouseMotion>, 
-    mut mouse_scroll_events: EventReader<bevy::input::mouse::MouseWheel>, 
-    mut mouse_button_events : EventReader<bevy::input::mouse::MouseButtonInput>, 
+    mut mouse_move_events: EventReader<bevy::input::mouse::MouseMotion>,
+    mut mouse_scroll_events: EventReader<bevy::input::mouse::MouseWheel>,
+    mut mouse_button_events : EventReader<bevy::input::mouse::MouseButtonInput>,
 
     mut input_map : ResMut<InputMap<M>>,
-    
+
     mut gamepad_axis_lasts : Local<HashMap<(Device,GamepadAxis),f32>>,
     mut key_lasts : Local<HashSet<KeyCode>>,
 
@@ -30,11 +30,11 @@ pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug>
         let immediate=false;
 
         match event {
-            GamepadEvent::Connection(GamepadConnectionEvent{gamepad,connection:GamepadConnection::Connected { 
-                name, vendor_id, product_id  
+            GamepadEvent::Connection(GamepadConnectionEvent{gamepad,connection:GamepadConnection::Connected {
+                name, vendor_id, product_id
             }})=> {
                 //println!("{gamepad} {name:?} Connected", );
-                
+
                 let mut device_index=None;
 
                 for (i,x) in input_map.gamepad_devices.iter().enumerate() {
@@ -52,7 +52,7 @@ pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug>
                 input_map.gamepad_device_entity_map.insert(*gamepad, device_index.unwrap());
 
                 //
-                
+
 
                 mapping_event_writer.send(InputMapEvent::GamepadConnect{entity:*gamepad,index:device_index.unwrap(),name:name.clone(),vendor_id:*vendor_id, product_id:*product_id});
 
@@ -84,9 +84,9 @@ pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug>
                 let axis_type=*axis_type;
                 let device=Device::Gamepad(input_map.gamepad_device_entity_map.get(entity).cloned().unwrap());
                 let binding=Binding::GamepadAxis(axis_type);
-                        
+
                 let dead_zone=input_map.device_dead_zones.get(&device).and_then(|x|x.get(&binding)).cloned().unwrap_or_default();
-                
+
                 let value=*value;
                 let value = if value>dead_zone.neg && value<dead_zone.pos {0.0} else {value};
 
@@ -95,9 +95,9 @@ pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug>
                 {
                     binding_input_event_writer.send(BindingInputEvent { device, immediate, binding, value, });
                 }
-               
+
                 //the "or" part is so to know if last val had been pos and cur val is <=0, so knows to send an event with val=0
-                if value>0.0 || last_value>0.0 && value <= 0.0 { 
+                if value>0.0 || last_value>0.0 && value <= 0.0 {
                     let value=value.max(0.0);
                     let binding=Binding::GamepadAxisPos(axis_type);
                     binding_input_event_writer.send(BindingInputEvent { device, immediate, binding, value, });
@@ -134,7 +134,7 @@ pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug>
                 let value=0.0;
                 let binding=Binding::Key(ev.key_code);
                 binding_input_event_writer.send(BindingInputEvent { device, immediate, binding, value, });
-                key_lasts.remove(&ev.key_code); //may not exist, if there was somehow a release without a press    
+                key_lasts.remove(&ev.key_code); //may not exist, if there was somehow a release without a press
             }
         }
     }
@@ -279,8 +279,8 @@ pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug>
 
 
 pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt::Debug> (
-    mut gamepad_events: EventReader<GamepadEvent>, 
-    mut binding_input_events: EventReader<BindingInputEvent>, 
+    mut gamepad_events: EventReader<GamepadEvent>,
+    mut binding_input_events: EventReader<BindingInputEvent>,
     mut input_map : ResMut<InputMap<M>>,
     // mut bind_mode_event_writer: EventWriter<InputMapBindModeEvent>,
     mut mapping_event_writer: EventWriter<InputMapEvent<M>>,
@@ -293,7 +293,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
     //clear player_bind_mode_bindings when bind mode turned off
     {
         // let player_bind_mode_devices=input_map.player_bind_mode_devices.clone();
-    
+
         // for (player,bind_mode_bindings) in input_map.player_bind_mode_bindings.iter_mut() {
         //     bind_mode_bindings.retain(|(device,binding)|{
         //         mapping_event_writer.send(InputMapEvent::BindReleased{player:player.0,device:device.clone(),binding:binding.clone()});
@@ -349,11 +349,11 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                 let binding_vals=player_mapping_binding_vals
                     .entry((player,mapping.clone()))
                     .or_insert_with(||mapping_val.binding_vals.clone());
-                
+
                 //
                 let last_val=mapping_val.binding_vals.iter().map(|x|*x.1).sum::<f32>();
                 let last_dir=if last_val>0.0{1}else if last_val<0.0{-1}else{0};
-                
+
                 //
                 binding_vals.retain(|(device,_bind_group),_binding_val|{
                     if gamepad_device==*device {
@@ -373,7 +373,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                     if cur_dir==0 || last_dir!=0 {
                         mapping_event_writer.send(InputMapEvent::JustReleased{ mapping: mapping.clone(), dir: last_dir, player: player.0 });
                     }
-                    
+
                     if last_dir==0 || cur_dir!=0 {
                         mapping_event_writer.send(InputMapEvent::JustPressed{ mapping: mapping.clone(), dir: cur_dir, player: player.0 });
                     }
@@ -407,28 +407,28 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
     //clear presseds on bind mode
     for (&player, devices) in input_map.player_bind_mode_devices.iter() {
-        
+
         //
         let Some(mapping_vals) = input_map.player_mappings.get(&player) else {
             continue;
         };
 
         for (mapping,mapping_val) in mapping_vals.iter() {
-        
+
             //get/init binding_vals
             let binding_vals=player_mapping_binding_vals
                 .entry((player,mapping.clone()))
                 .or_insert_with(||mapping_val.binding_vals.clone());
-            
+
             //
             let last_val=binding_vals.iter().map(|x|*x.1).sum::<f32>();
             let last_dir=if last_val>0.0{1}else if last_val<0.0{-1}else{0};
-            
+
             //remove bind_groups that have device in bindmode, and aren't excluded from it
             binding_vals.retain(|(device,bind_group),_|{
                 if !devices.contains(device) || (
-                    input_map.bind_mode_excludes.contains(&bind_group.primary) && 
-                    bind_group.modifiers.len()==bind_group.modifiers.iter().filter(|&x|input_map.bind_mode_excludes.contains(x)).count() 
+                    input_map.bind_mode_excludes.contains(&bind_group.primary) &&
+                    bind_group.modifiers.len()==bind_group.modifiers.iter().filter(|&x|input_map.bind_mode_excludes.contains(x)).count()
                 ) {
                     true
                 } else {
@@ -446,7 +446,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                 if cur_dir==0 || last_dir!=0 {
                     mapping_event_writer.send(InputMapEvent::JustReleased{ mapping: mapping.clone(), dir: last_dir, player: player.0 });
                 }
-                
+
                 if last_dir==0 || cur_dir!=0 {
                     mapping_event_writer.send(InputMapEvent::JustPressed { mapping: mapping.clone(), dir: cur_dir, player: player.0 });
                 }
@@ -471,7 +471,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
         if binding_input.value!=0.0 || binding_input.immediate {
             continue;
         }
-        
+
         //
         let Some(players)=device_players.get(&binding_input.device) else {
             continue;
@@ -481,7 +481,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
         for &player in players {
             //
             let Some(modifier_mappings) = input_map.player_modifier_mappings.get(&player)
-                .and_then(|modifier_mappings|modifier_mappings.get(&binding_input.binding)) 
+                .and_then(|modifier_mappings|modifier_mappings.get(&binding_input.binding))
             else {
                 continue;
             };
@@ -523,12 +523,12 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                     if cur_val==0.0 {
                         mapping_event_writer.send(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: cur_dir, player: player.0 });
                     }
-                
+
                 //
                 }
             }
 
-  
+
         }
     }
 
@@ -544,15 +544,15 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
             let bind_mode_devices=input_map.player_bind_mode_devices.get(&player);
 
             let is_bind_mode=bind_mode_devices.map(|bind_mode_devices|bind_mode_devices.contains(&binding_input.device)).unwrap_or_default();
-            
+
             if is_bind_mode && !input_map.bind_mode_excludes.contains(&binding_input.binding) {
                 continue;
             }
-    
+
             //
-            let Some(binding_mappings) = 
+            let Some(binding_mappings) =
                 input_map.player_binding_mappings.get(&player)
-                .and_then(|binding_mappings|binding_mappings.get(&binding_input.binding)) 
+                .and_then(|binding_mappings|binding_mappings.get(&binding_input.binding))
             else {
                 continue;
             };
@@ -585,7 +585,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                 if let Some((mapping,bind_group))=prev_binds.first() {
                     //get mapping val
                     let mapping_val = mapping_vals.get(mapping).unwrap();
-                
+
                     //get binding info
                     let binding_info=mapping_val.binding_infos.get(bind_group).unwrap();
 
@@ -604,7 +604,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                     //get valid binding mappings
                     let mut binding_mappings=binding_mappings.iter().map(|x|x.clone()).collect::<Vec<_>>();
                     binding_mappings.sort_by(|a,b|b.1.modifiers.len().cmp(&a.1.modifiers.len()));
-                    
+
                     binding_mappings.retain(|(mapping,bind_group)|{
                         //get mapping val
                         let mapping_val = mapping_vals.get(mapping).unwrap();
@@ -658,7 +658,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                 //get last binding val
                 let last_val=binding_vals.iter().map(|x|*x.1).sum::<f32>();
                 let last_dir=if last_val>0.0{1}else if last_val<0.0{-1}else{0};
-                
+
                 // println!("==m {mapping:?}");
 
                 //
@@ -673,7 +673,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
                     //
                     mapping_event_writer.send(InputMapEvent::TempValueChanged { mapping: mapping.clone(), val: cur_val, player: player.0 });
-                
+
                     //reset repeating
                     if input_map.mapping_repeats.contains_key(&mapping) {
                         not_repeatings.insert((player,mapping.clone()));
@@ -687,7 +687,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                     if last_dir==0 || last_dir!=cur_dir { //(last_dir!=cur_dir && last_dir!=0)
                         mapping_event_writer.send(InputMapEvent::JustPressed{ mapping:mapping.clone(), dir: cur_dir, player: player.0 }); //1
                         mapping_event_writer.send(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: cur_dir, player: player.0 }); //2
-                    } 
+                    }
 
                     if last_dir==cur_dir || last_dir!=0 {
                         mapping_event_writer.send(InputMapEvent::JustPressed { mapping: mapping.clone(), dir: last_dir, player: player.0 }); //3
@@ -713,7 +713,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                         if cur_dir==0 || last_dir!=0 {
                             mapping_event_writer.send(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: last_dir, player: player.0 });
                         }
-                        
+
                         if last_dir==0 || cur_dir!=0 {
                             mapping_event_writer.send(InputMapEvent::JustPressed { mapping: mapping.clone(), dir: cur_dir, player: player.0 });
                         }
@@ -726,9 +726,9 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                     }
 
                     // if last_dir!=cur_dir || cur_dir==0 { //(cur_dir==0 && last_dir==0)
-                   
+
                     // }
-    
+
                     //
                 }
             }
@@ -747,20 +747,20 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
         let mapping_val=input_map.player_mappings.get_mut(&player).unwrap().get_mut(&mapping).unwrap();
         mapping_val.repeating=false;
     }
-    
+
     //
     let mapping_repeats=input_map.mapping_repeats.clone();
 
     //do repeatings
-    for (mapping,repeat_time) in mapping_repeats //input_map.mapping_repeats.iter() 
+    for (mapping,repeat_time) in mapping_repeats //input_map.mapping_repeats.iter()
     {
         for (player,mapping_vals) in input_map.player_mappings.iter_mut() {
             let Some(mapping_val)=mapping_vals.get_mut(&mapping) else {continue;};
-            
+
             // let cur_val:f32=mapping_val.binding_vals.iter().map(|x|*x.1).sum();
             let cur_val:f32=mapping_val.binding_vals.iter().map(|x|*x.1).sum();
             let cur_dir=if cur_val>0.0{1}else if cur_val<0.0{-1}else{0};
-            
+
             if repeat_time<=0.0 {
                 continue;
             }
@@ -772,7 +772,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
             //
             if mapping_val.repeating {
                 let duration=repeat_time/cur_val.abs();
-                mapping_val.repeat_time_accum+=time.delta_secs(); 
+                mapping_val.repeat_time_accum+=time.delta_secs();
 
                 if mapping_val.repeat_time_accum>=duration {
                     mapping_event_writer.send(InputMapEvent::Repeat { mapping: mapping.clone(), dir: cur_dir, delay: duration, player: player.0 });
@@ -786,9 +786,9 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
             }
         }
     }
-    
+
     //
-    
+
     let mut player_bind_mode_bindings : HashMap<PlayerId,HashSet<(Device,Binding)>> = Default::default();
 
     //do bind mode
@@ -803,23 +803,23 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
             let bind_mode_devices=input_map.player_bind_mode_devices.get(&player);
 
             let is_bind_mode=bind_mode_devices.map(|bind_mode_devices|bind_mode_devices.contains(&binding_input.device)).unwrap_or_default();
-            
+
             if !is_bind_mode || input_map.bind_mode_excludes.contains(&binding_input.binding) {
                 continue;
             }
 
             //
             // let bind_mode_bindings=input_map.player_bind_mode_bindings.get(&player);
-            
+
             //get/init bind_mode_bindings
             let bind_mode_bindings=player_bind_mode_bindings.entry(player).or_insert_with(||{
                 input_map.player_bind_mode_bindings.get(&player).map(|x|x.clone()).unwrap_or_default()
             });
-            
+
             //
             let k=(binding_input.device,binding_input.binding);
-            let has_binding = bind_mode_bindings.contains(&k);        
-            
+            let has_binding = bind_mode_bindings.contains(&k);
+
             if binding_input.value!=0.0 && !has_binding {
                 // println!("a {:?} {:?} : {} {} : {bind_mode_bindings:?}",binding_input.device,binding_input.binding,binding_input.value, has_binding);
                 mapping_event_writer.send(InputMapEvent::BindPressed{player:player.0,device:binding_input.device,binding:binding_input.binding});
@@ -829,7 +829,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                 mapping_event_writer.send(InputMapEvent::BindReleased{player:player.0,device:binding_input.device,binding:binding_input.binding});
                 bind_mode_bindings.remove(&k);
             } else {
-                
+
                 // println!("c {:?} {:?} : {} {} : {bind_mode_bindings:?}",binding_input.device,binding_input.binding,binding_input.value, has_binding);
             }
             //
@@ -839,7 +839,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
 
 
-            // if 
+            // if
             // if binding_input.value ! {
 
             // }
@@ -852,7 +852,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
         let x=input_map.player_bind_mode_bindings.entry(player).or_default();
         x.clear();
         x.extend(bind_mode_bindings);
-      
+
     }
 }
 
