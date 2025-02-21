@@ -229,26 +229,7 @@ fn setup_menu(
     asset_server: Res<AssetServer>,
 ) {
     let font = asset_server.load("FiraMono-Medium.ttf");
-    // // let text_bundle=TextBundle::from_section("", Default::default());
-    // // let style=Style{align_self:AlignSelf::Center,justify_self:JustifySelf::Center,..Default::default()};
-    // // commands.spawn(text_bundle.with_style(style)).insert(MenuMarker);
 
-    // commands.spawn((
-    //     Text::new("hello\nbevy!"),
-    //     TextFont {
-    //         font: asset_server.load("FiraMono-Medium.ttf"),
-    //         font_size: 25.0,
-    //         ..default()
-    //     },
-    //     TextLayout::new_with_justify(JustifyText::Center),
-    //     Node {
-    //         position_type: PositionType::Absolute,
-    //         bottom: Val::Px(5.0),
-    //         right: Val::Px(5.0),
-    //         ..default()
-    //     },
-    //     MenuMarker,
-    // ));
     commands.spawn((
         Text::default(),
         TextLayout::new_with_justify(JustifyText::Center),
@@ -297,8 +278,6 @@ fn show_menu(
     menu : Res<Menu>,
     mapping_binds : Res<MappingBinds>,
 ) {
-    // let text_style = TextFont{ font, font_size:25.0 , ..Default::default()}; //, color: Color::WHITE
-
     for (item,mut text,mut col) in marker_query.iter_mut() {
 
         if item.0==menu.cur_index {
@@ -349,42 +328,5 @@ fn show_menu(
             _ => {}
         }
     }
-    // if let Ok(mut text)=marker_query.get_single_mut() {
-    //     text.sections.clear();
 
-    //     text.justify =JustifyText::Center;
-    //     text.sections.push(TextSection { value: "\"Press Up/Down to navigate, Enter to select, Escape to cancel/clear binding.\"\n".to_string(), style: TextStyle{font_size:20.0, ..text_style.clone()} }); //0
-    //     text.sections.push(TextSection { value: "\n".to_string(), style: text_style.clone()}); //1
-    //     text.sections.push(TextSection { value: format!("\"X={:.3}, Y={:.3}\"\n",menu.x_val,menu.y_val), style: TextStyle{font_size:20.0, ..text_style.clone()} }); //02
-    //     text.sections.push(TextSection { value: "\n".to_string(), style: text_style.clone()}); //3
-
-    //     text.sections.push(TextSection {
-    //         value: format!("Rebind X+ : {:?}\n",
-    //             if menu.in_bind_mode&&menu.cur_index==0 {"...".to_string()}else{mapping_binds.x_pos.bindings.first().map(|x|format!("{x:?}")).unwrap_or_default()}
-    //         ),
-    //         style: text_style.clone()}
-    //     );
-
-    //     text.sections.push(TextSection {
-    //         value: format!("Rebind X- : {:?}\n",
-    //             if menu.in_bind_mode&&menu.cur_index==1 {"...".to_string()}else{mapping_binds.x_neg.bindings.first().map(|x|format!("{x:?}")).unwrap_or_default()}
-    //         ),
-    //         style: text_style.clone()}
-    //     );
-
-    //     text.sections.push(TextSection {
-    //         value: format!("Rebind Y : {:?}\n",
-    //             if menu.in_bind_mode&&menu.cur_index==2 {"...".to_string()}else{mapping_binds.y.bindings.first().map(|x|format!("{x:?}")).unwrap_or_default()}
-    //         ),
-    //         style: text_style.clone()}
-    //     );
-
-    //     text.sections.push(TextSection { value: "Exit\n".to_string(), style: text_style.clone()});
-
-    //     text.sections[(menu.cur_index as usize)+4].style.color=Color::linear_rgb(1.0, 0.0, 0.0);
-
-    //     if let Some(i)=menu.pressed {
-    //         text.sections[(i as usize)+4].style.color=Color::linear_rgb(0.8, 0.8, 0.0);
-    //     }
-    // }
 }
