@@ -405,13 +405,22 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
         }
     }
 
+    //
+    let mut player_bind_mode_devices:HashMap<PlayerId,HashSet<Device>> = HashMap::new();
+
+    for &device in input_map.bind_mode_devices.iter() {
+        let Some(players)=device_players.get(&device) else {continue;};
+
+        for &player in players {
+            player_bind_mode_devices.entry(player).or_default().insert(device);
+        }
+    }
+
     //clear presseds on bind mode
-    for (&player, devices) in input_map.player_bind_mode_devices.iter() {
+    for (&player, devices) in player_bind_mode_devices.iter() {
 
         //
-        let Some(mapping_vals) = input_map.player_mappings.get(&player) else {
-            continue;
-        };
+        let Some(mapping_vals) = input_map.player_mappings.get(&player) else {continue;};
 
         for (mapping,mapping_val) in mapping_vals.iter() {
 
@@ -541,17 +550,17 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
         //
         for &player in players {
-            let bind_mode_devices=input_map.player_bind_mode_devices.get(&player);
+            // let bind_mode_devices=input_map.player_bind_mode_devices.get(&player);
 
-            let is_bind_mode=bind_mode_devices.map(|bind_mode_devices|bind_mode_devices.contains(&binding_input.device)).unwrap_or_default();
+            let is_bind_mode=input_map.bind_mode_devices.contains(&binding_input.device); //.unwrap_or_default();
 
             if is_bind_mode && !input_map.bind_mode_excludes.contains(&binding_input.binding) {
                 continue;
             }
 
             //
-            let Some(binding_mappings) =
-                input_map.player_binding_mappings.get(&player)
+            let Some(primary_mappings) =
+                input_map.player_primary_mappings.get(&player)
                 .and_then(|binding_mappings|binding_mappings.get(&binding_input.binding))
             else {
                 continue;
@@ -567,7 +576,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
             let found: Option<(M, BindingGroup,bool)>={
 
                 //check if any prev pressed
-                let prev_binds=binding_mappings.iter().filter(|(mapping,bind_group)|{
+                let prev_binds=primary_mappings.iter().filter(|(mapping,bind_group)|{
                     //get mapping val
                     let mapping_val = mapping_vals.get(mapping).unwrap();
 
@@ -602,7 +611,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                 } else {
 
                     //get valid binding mappings
-                    let mut binding_mappings=binding_mappings.iter().map(|x|x.clone()).collect::<Vec<_>>();
+                    let mut binding_mappings=primary_mappings.iter().map(|x|x.clone()).collect::<Vec<_>>();
                     binding_mappings.sort_by(|a,b|b.1.modifiers.len().cmp(&a.1.modifiers.len()));
 
                     binding_mappings.retain(|(mapping,bind_group)|{
@@ -789,20 +798,23 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
     //
 
-    let mut player_bind_mode_bindings : HashMap<PlayerId,HashSet<(Device,Binding)>> = Default::default();
+    // let mut player_bind_mode_bindings : HashMap<PlayerId,HashSet<(Device,Binding)>> = Default::default();
+
+    let mut bind_mode_bindings : HashSet<(Device,Binding)> = input_map.bind_mode_bindings.clone();
 
     //do bind mode
     for binding_input in binding_inputs.iter() {
         //
-        let Some(players)=device_players.get(&binding_input.device) else {
-            continue;
-        };
+        // let Some(players)=device_players.get(&binding_input.device) else {
+        //     continue;
+        // };
 
         //
-        for &player in players {
-            let bind_mode_devices=input_map.player_bind_mode_devices.get(&player);
+        // for &player in players
+        {
+            // let bind_mode_devices=input_map.player_bind_mode_devices.get(&player);
 
-            let is_bind_mode=bind_mode_devices.map(|bind_mode_devices|bind_mode_devices.contains(&binding_input.device)).unwrap_or_default();
+            let is_bind_mode=input_map.bind_mode_devices.contains(&binding_input.device); //.unwrap_or_default();
 
             if !is_bind_mode || input_map.bind_mode_excludes.contains(&binding_input.binding) {
                 continue;
@@ -812,9 +824,9 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
             // let bind_mode_bindings=input_map.player_bind_mode_bindings.get(&player);
 
             //get/init bind_mode_bindings
-            let bind_mode_bindings=player_bind_mode_bindings.entry(player).or_insert_with(||{
-                input_map.player_bind_mode_bindings.get(&player).map(|x|x.clone()).unwrap_or_default()
-            });
+            // let bind_mode_bindings=player_bind_mode_bindings.entry(player).or_insert_with(||{
+            //     input_map.player_bind_mode_bindings.get(&player).map(|x|x.clone()).unwrap_or_default()
+            // });
 
             //
             let k=(binding_input.device,binding_input.binding);
@@ -822,11 +834,19 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
             if binding_input.value!=0.0 && !has_binding {
                 // println!("a {:?} {:?} : {} {} : {bind_mode_bindings:?}",binding_input.device,binding_input.binding,binding_input.value, has_binding);
-                mapping_event_writer.send(InputMapEvent::BindPressed{player:player.0,device:binding_input.device,binding:binding_input.binding});
+
+                for &player in device_players.get(&binding_input.device).unwrap().iter() {
+                    mapping_event_writer.send(InputMapEvent::BindPressed{player:player.0,device:binding_input.device,binding:binding_input.binding});
+                }
+
                 bind_mode_bindings.insert(k);
             } else if binding_input.value==0.0 && has_binding {
                 // println!("b {:?} {:?} : {} {} : {bind_mode_bindings:?}",binding_input.device,binding_input.binding,binding_input.value, has_binding);
-                mapping_event_writer.send(InputMapEvent::BindReleased{player:player.0,device:binding_input.device,binding:binding_input.binding});
+
+                for &player in device_players.get(&binding_input.device).unwrap().iter() {
+                    mapping_event_writer.send(InputMapEvent::BindReleased{player:player.0,device:binding_input.device,binding:binding_input.binding});
+                }
+
                 bind_mode_bindings.remove(&k);
             } else {
 
@@ -848,12 +868,13 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
     }
 
     //store updated bind_mode_bindings
-    for (player,bind_mode_bindings) in player_bind_mode_bindings {
-        let x=input_map.player_bind_mode_bindings.entry(player).or_default();
-        x.clear();
-        x.extend(bind_mode_bindings);
+    input_map.bind_mode_bindings=bind_mode_bindings;
 
-    }
+    // for (player,bind_mode_bindings) in player_bind_mode_bindings {
+    //     let x=input_map.player_bind_mode_bindings.entry(player).or_default();
+    //     x.clear();
+    //     x.extend(bind_mode_bindings);
+    // }
 }
 
 /*

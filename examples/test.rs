@@ -154,7 +154,7 @@ fn update_input(
                 if let Some(pressed)=menu.pressed {
                     match pressed {
                         0..=2 => { //X+ X- Y
-                            input_map.set_player_bind_mode_devices(0, [axis_input::Device::Other,axis_input::Device::Gamepad(0)]);
+                            input_map.set_bind_mode_devices([axis_input::Device::Other,axis_input::Device::Gamepad(0)]);
                             menu.in_bind_mode=true;
                             println!("bind mode start");
                         }
@@ -168,7 +168,7 @@ fn update_input(
             }
 
             axis_input::InputMapEvent::BindPressed { player:0, binding, .. } => {
-                input_map.set_player_bind_mode_devices(0, []);
+                input_map.set_bind_mode_devices([]);
                 menu.in_bind_mode=false;
 
                 match menu.cur_index {
@@ -190,7 +190,7 @@ fn update_input(
             }
             axis_input::InputMapEvent::JustPressed{mapping:Mapping::MenuCancel, ..} => {
                 if menu.in_bind_mode {
-                    input_map.set_player_bind_mode_devices(0, []);
+                    input_map.set_bind_mode_devices([]);
                     menu.in_bind_mode=false;
                 } else {
                     match menu.cur_index {

@@ -11,21 +11,27 @@ use super::values::*;
 #[derive(Resource)]
 
 pub struct InputMap<M:Eq> {
-    pub(super) mapping_repeats : HashMap<M,f32>, //[mapping]=repeat
-    pub(super) device_dead_zones : HashMap<Device,HashMap<Binding,InputBindingDeadZone>>,
+    pub(super) mapping_repeats : HashMap<M,f32>, //[mapping]=repeat //
+    pub(super) device_dead_zones : HashMap<Device,HashMap<Binding,InputBindingDeadZone>>, //
 
     pub(super) player_mappings : HashMap<PlayerId, HashMap<M,MappingVal>>, //[player][mapping]=mapping_val
-    pub(super) player_binding_mappings : HashMap<PlayerId, HashMap<Binding,HashSet<(M,BindingGroup)>>>, //[player][primary_binding][(mapping,binding_group)]
+    pub(super) player_primary_mappings : HashMap<PlayerId, HashMap<Binding,HashSet<(M,BindingGroup)>>>, //[player][primary_binding][(mapping,binding_group)]
     pub(super) player_modifier_mappings : HashMap<PlayerId, HashMap<Binding,HashSet<(M,BindingGroup)>>>, //[player][modifier_binding][(mapping,binding_group)]
 
 
-    pub(super) player_devices : HashMap<PlayerId,HashSet<Device>>, //[player]=devices
-    pub(super) bind_mode_excludes : HashSet<Binding>, //[binding]
+    pub(super) player_devices : HashMap<PlayerId,HashSet<Device>>, //[player]=devices //
+    pub(super) bind_mode_excludes : HashSet<Binding>, //[binding] //
+
     // pub(super) bind_mode_enabled:bool,
-    pub(super) player_bind_mode_devices:HashMap<PlayerId,HashSet<Device>>,
-    pub(super) player_bind_mode_bindings:HashMap<PlayerId,HashSet<(Device,Binding)>>,
-    pub(super) bind_mode_dead_start:f32,
-    pub(super) bind_mode_dead_end:f32,
+
+    //
+    // pub(super) player_bind_mode_devices:HashMap<PlayerId,HashSet<Device>>, //
+    pub(super) bind_mode_devices:HashSet<Device>, //
+    // pub(super) player_bind_mode_bindings:HashMap<PlayerId,HashSet<(Device,Binding)>>,
+    pub(super) bind_mode_bindings:HashSet<(Device,Binding)>,
+
+    pub(super) bind_mode_dead_start:f32, //
+    pub(super) bind_mode_dead_end:f32, //
 
     //
 
@@ -38,13 +44,15 @@ impl<M:Eq> Default for InputMap<M> {
         Self {
             mapping_repeats:HashMap::new(),
             player_mappings : HashMap::new(),
-            player_binding_mappings : HashMap::new(),
+            player_primary_mappings : HashMap::new(),
             player_modifier_mappings : HashMap::new(),
             player_devices : HashMap::new(),
             device_dead_zones : HashMap::new(),
             // bind_mode_enabled:false,
-            player_bind_mode_devices: HashMap::new(),
-            player_bind_mode_bindings: HashMap::new(),
+            // player_bind_mode_devices: HashMap::new(),
+            bind_mode_devices: HashSet::new(),
+            // player_bind_mode_bindings: HashMap::new(),
+            bind_mode_bindings: HashSet::new(),
             bind_mode_dead_start:0.4,
             bind_mode_dead_end:0.2,
             bind_mode_excludes:HashSet::new(),
@@ -102,8 +110,10 @@ where
         // println!("hmm {:?}",self.bind_mode_excludes);
     }
 
-    pub fn set_player_bind_mode_devices<I> //<I,J>
-        (&mut self,player:i32,devices:I)
+    pub fn set_bind_mode_devices<I> //<I,J>
+        (&mut self,
+            //player:i32,
+            devices:I)
     where
         // I:AsRef<[Device]>
         // I: IntoIterator<Item = J>,
@@ -114,10 +124,10 @@ where
 
         I: IntoIterator<Item=Device>,
     {
-        let bind_mode_devices=self.player_bind_mode_devices.entry(PlayerId(player)).or_default();
-        bind_mode_devices.clear();
+        // let bind_mode_devices=self.player_bind_mode_devices.entry(PlayerId(player)).or_default();
+        self.bind_mode_devices.clear();
         // bind_mode_devices.extend(devices.as_ref());
-        bind_mode_devices.extend(devices.into_iter());
+        self.bind_mode_devices.extend(devices.into_iter());
         // bind_mode_devices.extend(devices.into_iter().map(|x|*x.borrow()));
         // bind_mode_devices.extend(devices.into_iter().map(|x|x));
         // bind_mode_devices.extend(devices.into_iter().map(|x|x.clone()));
@@ -159,12 +169,12 @@ where
 
         //setup primary binding mappings
         {
-            let binding_mappings=self.player_binding_mappings.entry(player).or_default();
-            binding_mappings.clear();
+            let primary_mappings=self.player_primary_mappings.entry(player).or_default();
+            primary_mappings.clear();
 
             for (mapping,temp_bindings) in temp_player_mappings.iter() {
                 for (bind_group,_) in temp_bindings.iter() {
-                    binding_mappings.entry(bind_group.primary).or_default().insert((mapping.clone(),bind_group.clone()));
+                    primary_mappings.entry(bind_group.primary).or_default().insert((mapping.clone(),bind_group.clone()));
                 }
             }
             // println!("binding_mappings {binding_mappings:?}");
