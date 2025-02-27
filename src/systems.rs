@@ -9,6 +9,30 @@ use super::resources::*;
 use super::events::*;
 use super::values::*;
 
+fn use_dead_zone(value:f32,dead_zone:&InputBindingDeadZone) -> f32 {
+    let pos_min=dead_zone.pos_min.max(dead_zone.neg_min);
+    let neg_min=dead_zone.neg_min.min(dead_zone.pos_min);
+    let pos_max=dead_zone.pos_max.min(pos_min);
+    let neg_max=dead_zone.neg_max.min(neg_min);
+
+    if value > pos_min {
+        let len=pos_max-pos_min;
+
+        if len>0.0 {
+            return value.clamp(pos_min,pos_max)/len;
+        }
+
+    } else if value < neg_min {
+        let len=neg_max-neg_min;
+
+        if len>0.0 {
+            return value.clamp(neg_max,neg_min)/len;
+        }
+    }
+
+    0.0
+}
+
 pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug>
 (
     mut gamepad_events: EventReader<GamepadEvent>,
@@ -74,9 +98,7 @@ pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug>
                 let binding=Binding::GamepadButton(*button_type);
 
                 let dead_zone=input_map.device_dead_zones.get(&device).and_then(|x|x.get(&binding)).cloned().unwrap_or_default();
-
-                let value=*value;
-                let value = if value>dead_zone.neg && value<dead_zone.pos {0.0} else {value};
+                let value=use_dead_zone(*value,&dead_zone);
 
                 binding_input_event_writer.send(BindingInputEvent { device, immediate, binding, value, });
             }
@@ -86,9 +108,7 @@ pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug>
                 let binding=Binding::GamepadAxis(axis_type);
 
                 let dead_zone=input_map.device_dead_zones.get(&device).and_then(|x|x.get(&binding)).cloned().unwrap_or_default();
-
-                let value=*value;
-                let value = if value>dead_zone.neg && value<dead_zone.pos {0.0} else {value};
+                let value=use_dead_zone(*value,&dead_zone);
 
                 let last_value=gamepad_axis_lasts.get(&(device,axis_type)).cloned().unwrap_or_default();
 

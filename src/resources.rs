@@ -7,6 +7,16 @@ use bevy::prelude::Entity;
 
 use super::values::*;
 
+/*
+* should set device dead zone by single vec2 for deadpos, and then a second vec2 for dead range?
+** could automatically calculate it?
+*** need a way to zero and check neg/pos range
+*** need way to get and set those values
+
+** but dead zone can be the new zero point, but also the max pos and neg vals
+*** need to recalc axis value based on between those values, ie
+** or let steam or external apps handle it?
+*/
 
 #[derive(Resource)]
 
@@ -25,9 +35,7 @@ pub struct InputMap<M:Eq> {
     // pub(super) bind_mode_enabled:bool,
 
     //
-    // pub(super) player_bind_mode_devices:HashMap<PlayerId,HashSet<Device>>, //
     pub(super) bind_mode_devices:HashSet<Device>, //
-    // pub(super) player_bind_mode_bindings:HashMap<PlayerId,HashSet<(Device,Binding)>>,
     pub(super) bind_mode_bindings:HashSet<(Device,Binding)>,
 
     pub(super) bind_mode_dead_start:f32, //
@@ -229,22 +237,22 @@ where
         // I: IntoIterator<Item = (Binding,f32,f32)>,
         I: IntoIterator<Item = SetBindingDead>,
     {
-        //axis:GamepadAxisType GamepadButtonType gamepad_id:usize
-        //should only need to do for gamepad axises
-        // but for some reason the GamepadAxisType::LeftZ, GamepadAxisType::RightZ do nothing
-        // and the GamepadButtonType::LeftTrigger, GamepadButtonType::RightTrigger are used for the axis values
+    //     //axis:GamepadAxisType GamepadButtonType gamepad_id:usize
+    //     //should only need to do for gamepad axises
+    //     // but for some reason the GamepadAxisType::LeftZ, GamepadAxisType::RightZ do nothing
+    //     // and the GamepadButtonType::LeftTrigger, GamepadButtonType::RightTrigger are used for the axis values
 
-        let device_deads=self.device_dead_zones.entry(device).or_default();
-        device_deads.clear();
+    //     let device_deads=self.device_dead_zones.entry(device).or_default();
+    //     device_deads.clear();
 
-        // device_deads.extend(binding_deads.as_ref().iter().map(|&(binding,neg,pos)|(binding,InputBindingDeadZone {neg,pos})));
-        // device_deads.extend(binding_deads.into_iter().map(|(binding,neg,pos)|(binding,InputBindingDeadZone {neg,pos})));
-        device_deads.extend(binding_deads.into_iter().map(|x|(x.binding,InputBindingDeadZone {neg:x.neg,pos:x.pos})));
+    //     // device_deads.extend(binding_deads.as_ref().iter().map(|&(binding,neg,pos)|(binding,InputBindingDeadZone {neg,pos})));
+    //     // device_deads.extend(binding_deads.into_iter().map(|(binding,neg,pos)|(binding,InputBindingDeadZone {neg,pos})));
+    //     device_deads.extend(binding_deads.into_iter().map(|x|(x.binding,InputBindingDeadZone {neg:x.neg,pos:x.pos})));
 
-    //     device_deads.extend(binding_deads.into_iter()
-    //         .map(|x|x.borrow().clone())
-    //         .map(|(binding,neg,pos)|(binding,InputBindingDeadZone {neg,pos}))
-    //     );
+    // //     device_deads.extend(binding_deads.into_iter()
+    // //         .map(|x|x.borrow().clone())
+    // //         .map(|(binding,neg,pos)|(binding,InputBindingDeadZone {neg,pos}))
+    // //     );
     }
 
     pub fn set_mapping_repeats<I> //<I,J>

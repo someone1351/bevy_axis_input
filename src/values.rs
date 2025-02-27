@@ -46,8 +46,10 @@ pub(super)struct MappingVal {
 
 #[derive(Default,Clone)]
 pub(super)struct InputBindingDeadZone {
-    pub neg : f32,
-    pub pos : f32,
+    pub pos_max : f32,
+    pub pos_min : f32,
+    pub neg_max: f32,
+    pub neg_min : f32,
 }
 
 #[derive(Clone,Debug)]
@@ -60,7 +62,7 @@ pub struct SetMappingBind<M:Clone> {
 }
 
 impl<M:Default+Clone> Default for SetMappingBind<M> {
-    fn default() -> Self { 
+    fn default() -> Self {
         Self { mapping: Default::default(), bindings: vec![], scale: 1.0, primary_dead: 0.0, modifier_dead: 0.0 }
     }
 }
@@ -85,7 +87,7 @@ pub enum Binding {
 
     MouseMoveX,
     MouseMoveY,
-    
+
     MouseMovePosX,
     MouseMovePosY,
     MouseMoveNegX,
@@ -94,7 +96,7 @@ pub enum Binding {
     MouseScrollPixelX,
     MouseScrollPixelY,
 
-    
+
     MouseScrollPixelPosX,
     MouseScrollPixelPosY,
     MouseScrollPixelNegX,
@@ -109,7 +111,7 @@ pub enum Binding {
     MouseScrollLineNegX,
     MouseScrollLineNegY,
 
-    
+
     GamepadAxisPos(GamepadAxis),
     GamepadAxisNeg(GamepadAxis),
 
@@ -157,7 +159,7 @@ impl Binding {
             Self::MouseScrollPixelY => "MouseScrollY",
             Self::MouseScrollLineX => "MouseScrollLineX",
             Self::MouseScrollLineY => "MouseScrollLineY",
-            
+
             Self::MouseMovePosX => "MouseMovePosX",
             Self::MouseMovePosY => "MouseMovePosY",
             Self::MouseMoveNegX => "MouseMoveNegX",
@@ -176,7 +178,7 @@ impl Binding {
             Self::GamepadAxisPos(_) => "GamepadAxisPos",
             Self::GamepadAxisNeg(_) => "GamepadAxisNeg",
             Self::None => "None",
-        
+
         }
     }
 }
