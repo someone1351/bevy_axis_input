@@ -20,7 +20,7 @@ TODO
 - binding a modifier+key,
 - binding only a modifier key, would require the binding be sent on the key release
 - let any key (except same) be used as modifier?
-- have multiple or single modifier key? if multiple, 
+- have multiple or single modifier key? if multiple,
 - - have to be done in order
 - - only send key press when all modifier keys pressed
 - - send key release when any of the keys released
@@ -30,7 +30,7 @@ TODO
 - - - use 0.5 dead zone when bindings
 
 * InputMapBindingEvent
-* * add hashset of modifiers, 
+* * add hashset of modifiers,
 * * * have any bindings (of same device?) currently pressed added to modifier hashset
 * * check when any of pressed bindevents have been released after being pressed?
 
@@ -41,10 +41,12 @@ mod systems;
 mod values;
 mod events;
 mod plugin;
+mod components;
 
 pub use resources::*;
 pub use values::*;
 pub use events::*;
+pub use components::*;
 
 pub use plugin::*;
 // pub use resources::InputMap;
