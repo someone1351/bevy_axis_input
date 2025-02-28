@@ -25,12 +25,13 @@ pub enum InputMapEvent<M:Debug> {
     ValueChanged{mapping:M, val:f32, player:i32},
     TempValueChanged{mapping:M, val:f32, player:i32},
 
-    BindPressed{player:i32, device : Device, binding : Binding, },
-    BindReleased{player:i32, device : Device, binding : Binding, },
+    BindPress{player:i32, device : Device, binding : Binding, },
+    //BindReleased{player:i32, device : Device, binding : Binding, },
+    BindRelease{player:i32, device : Device, bindings : Vec<Binding>, },
 }
 
 // impl<M:Copy+Debug> InputMapEvent<M> {
-//     pub fn forward<T:Debug>(&self,f : fn(M)->Option<T>)->Option<InputMapEvent<T>> {        
+//     pub fn forward<T:Debug>(&self,f : fn(M)->Option<T>)->Option<InputMapEvent<T>> {
 //         match *self {
 //             Self::Repeat(p,m,s,t)=>f(m).and_then(|x|Some(InputMapEvent::Repeat(p,x,s,t))),
 //             Self::JustPressed(p,m,s)=>f(m).and_then(|x|Some(InputMapEvent::JustPressed(p,x,s))),

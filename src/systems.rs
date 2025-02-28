@@ -9,7 +9,11 @@ use super::resources::*;
 use super::events::*;
 use super::values::*;
 
-fn use_dead_zone(value:f32,dead_zone:&InputBindingDeadZone) -> f32 {
+fn use_dead_zone(value:f32,dead_zone:Option<&InputDeviceDeadZone>) -> f32 {
+    let Some(dead_zone)=dead_zone else {
+        return value;
+    };
+
     let pos_min=dead_zone.pos_min.max(dead_zone.neg_min);
     let neg_min=dead_zone.neg_min.min(dead_zone.pos_min);
     let pos_max=dead_zone.pos_max.min(pos_min);
@@ -97,8 +101,8 @@ pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug>
                 let device=Device::Gamepad(input_map.gamepad_device_entity_map.get(entity).cloned().unwrap());
                 let binding=Binding::GamepadButton(*button_type);
 
-                let dead_zone=input_map.device_dead_zones.get(&device).and_then(|x|x.get(&binding)).cloned().unwrap_or_default();
-                let value=use_dead_zone(*value,&dead_zone);
+                let dead_zone=input_map.device_dead_zones.get(&(device,binding));
+                let value=use_dead_zone(*value,dead_zone);
 
                 binding_input_event_writer.send(BindingInputEvent { device, immediate, binding, value, });
             }
@@ -107,8 +111,8 @@ pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug>
                 let device=Device::Gamepad(input_map.gamepad_device_entity_map.get(entity).cloned().unwrap());
                 let binding=Binding::GamepadAxis(axis_type);
 
-                let dead_zone=input_map.device_dead_zones.get(&device).and_then(|x|x.get(&binding)).cloned().unwrap_or_default();
-                let value=use_dead_zone(*value,&dead_zone);
+                let dead_zone=input_map.device_dead_zones.get(&(device,binding));
+                let value=use_dead_zone(*value,dead_zone);
 
                 let last_value=gamepad_axis_lasts.get(&(device,axis_type)).cloned().unwrap_or_default();
 
@@ -309,6 +313,103 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
     mut modifier_binding_vals : Local<HashMap<(Device,Binding),f32>>,
 ) {
 
+    let InputMap {
+        player_bindings, player_bindings_updated,
+        mapping_repeats,
+        // device_dead_zones,
+        player_mappings, player_primary_mappings, player_modifier_mappings,
+        device_player,
+        bind_mode_excludes, bind_mode_devices, bind_mode_bindings,
+        // bind_mode_start_dead, bind_mode_end_dead,
+        gamepad_devices, gamepad_device_entity_map,
+        bind_mode_chain,
+        ..
+    }=input_map.as_mut();
+
+    //
+    if *player_bindings_updated {
+        *player_bindings_updated=false;
+
+        for (&player,mappings) in player_bindings.iter() {
+            let mut temp_player_mappings: HashMap<M, HashMap<BindingGroup,MappingBindingInfo>>=HashMap::new();
+
+            //collect input in temp mappings
+            // for (mapping,bindings,scale,primary_dead,modifier_dead) in mappings.into_iter()
+            for ((mapping, bindings),&(scale, primary_dead, modifier_dead)) in mappings.iter() {
+
+                // let (mapping,bindings,scale,primary_dead,modifier_dead)=x; //x.borrow().clone();
+
+                if bindings.is_empty() {
+                    continue;
+                }
+
+                let temp_bindings=temp_player_mappings.entry(mapping.clone()).or_default();
+                // let mut modifiers=bindings.to_vec();
+                // let primary=modifiers.pop().unwrap();
+
+                // let modifiers=HashSet::from(modifiers);
+                let binding_group=BindingGroup{ modifiers: bindings[0..bindings.len()-1].to_vec(), primary: bindings.last().unwrap().clone() };
+
+                temp_bindings.insert(binding_group,MappingBindingInfo{scale,primary_dead,modifier_dead}); //,binding_val:0.0
+            }
+
+            //setup primary binding mappings
+            {
+                let primary_mappings=player_primary_mappings.entry(player).or_default();
+                primary_mappings.clear();
+
+                for (mapping,temp_bindings) in temp_player_mappings.iter() {
+                    for (bind_group,_) in temp_bindings.iter() {
+                        primary_mappings.entry(bind_group.primary).or_default().insert((mapping.clone(),bind_group.clone()));
+                    }
+                }
+                // println!("binding_mappings {binding_mappings:?}");
+            }
+
+            //setup modifier binding mappings
+            {
+                let modifier_mappings=player_modifier_mappings.entry(player).or_default();
+                modifier_mappings.clear();
+
+                for (mapping,temp_bindings) in temp_player_mappings.iter() {
+                    for (bind_group,_) in temp_bindings.iter() {
+                        for &modifier in bind_group.modifiers.iter() {
+                            modifier_mappings.entry(modifier).or_default().insert((mapping.clone(),bind_group.clone()));
+                        }
+                    }
+                }
+
+                // println!("modifier_mappings {modifier_mappings:?}");
+            }
+
+            //setup/insert mappings
+            {
+                let mappings=player_mappings.entry(player).or_insert_with(Default::default);
+
+                //remove mappings from player_mappings not in temp
+                mappings.retain(|k,_|temp_player_mappings.contains_key(k));
+
+                //add new mappings/binding_infos or replace bindings in player_mapping from temp
+                for (mapping,temp_bindings) in temp_player_mappings {
+                    let mapping_val=mappings.entry(mapping).or_default();
+
+                    //remove any cur binding valss that are no longer used
+                    for k in mapping_val.binding_vals.keys().cloned().collect::<Vec<_>>() {
+                        if !temp_bindings.contains_key(&k.1) {
+                            mapping_val.binding_vals.remove(&k).unwrap();
+                        }
+                    }
+
+                    //
+                    mapping_val.binding_infos=temp_bindings;
+                }
+            }
+        }
+
+    }
+
+
+
 
     //clear player_bind_mode_bindings when bind mode turned off
     {
@@ -316,28 +417,28 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
         // for (player,bind_mode_bindings) in input_map.player_bind_mode_bindings.iter_mut() {
         //     bind_mode_bindings.retain(|(device,binding)|{
-        //         mapping_event_writer.send(InputMapEvent::BindReleased{player:player.0,device:device.clone(),binding:binding.clone()});
+        //         mapping_event_writer.send(InputMapEvent::BindReleased{player:player,device:device.clone(),binding:binding.clone()});
         //         !player_bind_mode_devices.get(player).map(|x|x.contains(device)).unwrap_or_default()
         //     });
         // }
     }
 
     //get players by device
-    let device_players= {
-        let mut device_players= HashMap::<Device,Vec<PlayerId>>::new();
+    // let device_players= {
+    //     let mut device_players= HashMap::<Device,Vec<PlayerId>>::new();
 
-        for (&player,devices) in input_map.player_devices.iter() {
-            for &device in devices.iter() {
-                device_players.entry(device).or_default().push(player);
-            }
-        }
+    //     for (&player,devices) in input_map.player_devices.iter() {
+    //         for &device in devices.iter() {
+    //             device_players.entry(device).or_default().push(player);
+    //         }
+    //     }
 
-        device_players
-    };
+    //     device_players
+    // };
 
     //
-    let mut player_mapping_binding_vals : HashMap<(PlayerId,M),HashMap<(Device,BindingGroup),f32>> = Default::default();
-    let mut not_repeatings : HashSet<(PlayerId, M)> = Default::default();
+    let mut player_mapping_binding_vals : HashMap<(i32,M),HashMap<(Device,BindingGroup),f32>> = Default::default();
+    let mut not_repeatings : HashSet<(i32, M)> = Default::default();
 
     //release inputs of disconnected gamepad (todo)
     for event in gamepad_events.read() {
@@ -345,21 +446,26 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
             continue;
         };
 
-        let gamepad_device=Device::Gamepad(input_map.gamepad_device_entity_map.get(gamepad).cloned().unwrap());
+        let gamepad_device=Device::Gamepad(gamepad_device_entity_map.get(gamepad).cloned().unwrap());
 
         //
         {
-            let i =input_map.gamepad_device_entity_map.remove(gamepad).unwrap();
-            *input_map.gamepad_devices.get_mut(i).unwrap()=None;
+            let i =gamepad_device_entity_map.remove(gamepad).unwrap();
+            *gamepad_devices.get_mut(i).unwrap()=None;
         }
 
         //
-        let Some(players)=device_players.get(&gamepad_device) else {
+        // let Some(players)=device_players.get(&gamepad_device) else {
+        //     continue;
+        // };
+
+        let Some(player)=device_player.get(&gamepad_device).cloned() else {
             continue;
         };
 
-        for &player in players.iter() {
-            let Some(mappings)=input_map.player_mappings.get(&player) else {
+        // for &player in players.iter()
+        {
+            let Some(mappings)=player_mappings.get(&player) else {
                 continue;
             };
 
@@ -391,15 +497,15 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                 if last_dir!=cur_dir {
                     //send press/release event
                     if cur_dir==0 || last_dir!=0 {
-                        mapping_event_writer.send(InputMapEvent::JustReleased{ mapping: mapping.clone(), dir: last_dir, player: player.0 });
+                        mapping_event_writer.send(InputMapEvent::JustReleased{ mapping: mapping.clone(), dir: last_dir, player: player });
                     }
 
                     if last_dir==0 || cur_dir!=0 {
-                        mapping_event_writer.send(InputMapEvent::JustPressed{ mapping: mapping.clone(), dir: cur_dir, player: player.0 });
+                        mapping_event_writer.send(InputMapEvent::JustPressed{ mapping: mapping.clone(), dir: cur_dir, player: player });
                     }
 
                     //reset repeating
-                    if input_map.mapping_repeats.contains_key(&mapping) {
+                    if mapping_repeats.contains_key(&mapping) {
                         not_repeatings.insert((player,mapping.clone()));
                     }
                 }
@@ -426,21 +532,25 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
     }
 
     //
-    let mut player_bind_mode_devices:HashMap<PlayerId,HashSet<Device>> = HashMap::new();
+    let mut player_bind_mode_devices:HashMap<i32,HashSet<Device>> = HashMap::new();
 
-    for &device in input_map.bind_mode_devices.iter() {
-        let Some(players)=device_players.get(&device) else {continue;};
+    for &device in bind_mode_devices.iter() {
+        // let Some(players)=device_players.get(&device) else {continue;};
 
-        for &player in players {
-            player_bind_mode_devices.entry(player).or_default().insert(device);
-        }
+        let Some(player)=device_player.get(&device).cloned() else {
+            continue;
+        };
+
+        // for &player in players {
+        player_bind_mode_devices.entry(player).or_default().insert(device);
+        // }
     }
 
     //clear presseds on bind mode
     for (&player, devices) in player_bind_mode_devices.iter() {
 
         //
-        let Some(mapping_vals) = input_map.player_mappings.get(&player) else {continue;};
+        let Some(mapping_vals) = player_mappings.get(&player) else {continue;};
 
         for (mapping,mapping_val) in mapping_vals.iter() {
 
@@ -456,8 +566,8 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
             //remove bind_groups that have device in bindmode, and aren't excluded from it
             binding_vals.retain(|(device,bind_group),_|{
                 if !devices.contains(device) || (
-                    input_map.bind_mode_excludes.contains(&bind_group.primary) &&
-                    bind_group.modifiers.len()==bind_group.modifiers.iter().filter(|&x|input_map.bind_mode_excludes.contains(x)).count()
+                    bind_mode_excludes.contains(&bind_group.primary) &&
+                    bind_group.modifiers.len()==bind_group.modifiers.iter().filter(|&x|bind_mode_excludes.contains(x)).count()
                 ) {
                     true
                 } else {
@@ -473,15 +583,15 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
             if last_dir!=cur_dir {
                 //send press/release event
                 if cur_dir==0 || last_dir!=0 {
-                    mapping_event_writer.send(InputMapEvent::JustReleased{ mapping: mapping.clone(), dir: last_dir, player: player.0 });
+                    mapping_event_writer.send(InputMapEvent::JustReleased{ mapping: mapping.clone(), dir: last_dir, player: player });
                 }
 
                 if last_dir==0 || cur_dir!=0 {
-                    mapping_event_writer.send(InputMapEvent::JustPressed { mapping: mapping.clone(), dir: cur_dir, player: player.0 });
+                    mapping_event_writer.send(InputMapEvent::JustPressed { mapping: mapping.clone(), dir: cur_dir, player: player });
                 }
 
                 //reset repeating
-                if input_map.mapping_repeats.contains_key(&mapping) {
+                if mapping_repeats.contains_key(&mapping) {
                     not_repeatings.insert((player,mapping.clone()));
                 }
             }
@@ -502,21 +612,26 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
         }
 
         //
-        let Some(players)=device_players.get(&binding_input.device) else {
+        // let Some(players)=device_players.get(&binding_input.device) else {
+        //     continue;
+        // };
+
+        let Some(player)=device_player.get(&binding_input.device).cloned() else {
             continue;
         };
 
         //
-        for &player in players {
+        // for &player in players
+        {
             //
-            let Some(modifier_mappings) = input_map.player_modifier_mappings.get(&player)
+            let Some(modifier_mappings) = player_modifier_mappings.get(&player)
                 .and_then(|modifier_mappings|modifier_mappings.get(&binding_input.binding))
             else {
                 continue;
             };
 
             //
-            let Some(mapping_vals) = input_map.player_mappings.get(&player) else {
+            let Some(mapping_vals) = player_mappings.get(&player) else {
                 continue;
             };
 
@@ -546,11 +661,11 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
                     //
                     if cur_val!=binding_val {
-                        mapping_event_writer.send(InputMapEvent::ValueChanged { mapping: mapping.clone(), val: cur_val, player: player.0 });
+                        mapping_event_writer.send(InputMapEvent::ValueChanged { mapping: mapping.clone(), val: cur_val, player: player });
                     }
 
                     if cur_val==0.0 {
-                        mapping_event_writer.send(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: cur_dir, player: player.0 });
+                        mapping_event_writer.send(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: cur_dir, player: player });
                     }
 
                 //
@@ -564,30 +679,35 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
     //primaries
     for binding_input in binding_inputs.iter() {
         //
-        let Some(players)=device_players.get(&binding_input.device) else {
+        // let Some(players)=device_players.get(&binding_input.device) else {
+        //     continue;
+        // };
+
+        let Some(player)=device_player.get(&binding_input.device).cloned() else {
             continue;
         };
 
         //
-        for &player in players {
+        // for &player in players
+        {
             // let bind_mode_devices=input_map.player_bind_mode_devices.get(&player);
 
-            let is_bind_mode=input_map.bind_mode_devices.contains(&binding_input.device); //.unwrap_or_default();
+            let is_bind_mode=bind_mode_devices.contains(&binding_input.device); //.unwrap_or_default();
 
-            if is_bind_mode && !input_map.bind_mode_excludes.contains(&binding_input.binding) {
+            if is_bind_mode && !bind_mode_excludes.contains(&binding_input.binding) {
                 continue;
             }
 
             //
             let Some(primary_mappings) =
-                input_map.player_primary_mappings.get(&player)
+                player_primary_mappings.get(&player)
                 .and_then(|binding_mappings|binding_mappings.get(&binding_input.binding))
             else {
                 continue;
             };
 
             //
-            let Some(mapping_vals) = input_map.player_mappings.get(&player) else {
+            let Some(mapping_vals) = player_mappings.get(&player) else {
                 continue;
             };
 
@@ -650,7 +770,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                                 return false;
                             }
 
-                            if is_bind_mode && !input_map.bind_mode_excludes.contains(&modifier_bind)
+                            if is_bind_mode && !bind_mode_excludes.contains(&modifier_bind)
                             {
                                 return false;
                             }
@@ -701,25 +821,25 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                     let cur_dir=if cur_val>0.0{1}else if cur_val<0.0{-1}else{0};
 
                     //
-                    mapping_event_writer.send(InputMapEvent::TempValueChanged { mapping: mapping.clone(), val: cur_val, player: player.0 });
+                    mapping_event_writer.send(InputMapEvent::TempValueChanged { mapping: mapping.clone(), val: cur_val, player: player });
 
                     //reset repeating
-                    if input_map.mapping_repeats.contains_key(&mapping) {
+                    if mapping_repeats.contains_key(&mapping) {
                         not_repeatings.insert((player,mapping.clone()));
                     }
 
                     //send press/release events (cur_dir will never be 0)
                     if last_dir==cur_dir || last_dir!=0 { //(last_dir!=cur_dir && last_dir!=0)
-                        mapping_event_writer.send(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: last_dir, player: player.0 }); //0
+                        mapping_event_writer.send(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: last_dir, player: player }); //0
                     }
 
                     if last_dir==0 || last_dir!=cur_dir { //(last_dir!=cur_dir && last_dir!=0)
-                        mapping_event_writer.send(InputMapEvent::JustPressed{ mapping:mapping.clone(), dir: cur_dir, player: player.0 }); //1
-                        mapping_event_writer.send(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: cur_dir, player: player.0 }); //2
+                        mapping_event_writer.send(InputMapEvent::JustPressed{ mapping:mapping.clone(), dir: cur_dir, player: player }); //1
+                        mapping_event_writer.send(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: cur_dir, player: player }); //2
                     }
 
                     if last_dir==cur_dir || last_dir!=0 {
-                        mapping_event_writer.send(InputMapEvent::JustPressed { mapping: mapping.clone(), dir: last_dir, player: player.0 }); //3
+                        mapping_event_writer.send(InputMapEvent::JustPressed { mapping: mapping.clone(), dir: last_dir, player: player }); //3
                     }
                 } else {
                     //binding input val
@@ -733,22 +853,22 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
                     //change event
                     if last_val!=cur_val {
-                        mapping_event_writer.send(InputMapEvent::ValueChanged { mapping: mapping.clone(), val: cur_val, player: player.0 });
+                        mapping_event_writer.send(InputMapEvent::ValueChanged { mapping: mapping.clone(), val: cur_val, player: player });
                     }
 
                     //
                     if last_dir!=cur_dir {
                         //send press/release event
                         if cur_dir==0 || last_dir!=0 {
-                            mapping_event_writer.send(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: last_dir, player: player.0 });
+                            mapping_event_writer.send(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: last_dir, player: player });
                         }
 
                         if last_dir==0 || cur_dir!=0 {
-                            mapping_event_writer.send(InputMapEvent::JustPressed { mapping: mapping.clone(), dir: cur_dir, player: player.0 });
+                            mapping_event_writer.send(InputMapEvent::JustPressed { mapping: mapping.clone(), dir: cur_dir, player: player });
                         }
 
                         //reset repeating
-                        if input_map.mapping_repeats.contains_key(&mapping) {
+                        if mapping_repeats.contains_key(&mapping) {
                             not_repeatings.insert((player,mapping.clone()));
                         }
 
@@ -767,23 +887,23 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
     //store updated binding vals
     for ((player,mapping),binding_vals) in player_mapping_binding_vals {
-        let mapping_val=input_map.player_mappings.get_mut(&player).unwrap().get_mut(&mapping).unwrap();
+        let mapping_val=player_mappings.get_mut(&player).unwrap().get_mut(&mapping).unwrap();
         mapping_val.binding_vals=binding_vals;
     }
 
     //set disabled/reset repeats
     for (player,mapping) in not_repeatings {
-        let mapping_val=input_map.player_mappings.get_mut(&player).unwrap().get_mut(&mapping).unwrap();
+        let mapping_val=player_mappings.get_mut(&player).unwrap().get_mut(&mapping).unwrap();
         mapping_val.repeating=false;
     }
 
     //
-    let mapping_repeats=input_map.mapping_repeats.clone();
+    let mapping_repeats=mapping_repeats.clone();
 
     //do repeatings
     for (mapping,repeat_time) in mapping_repeats //input_map.mapping_repeats.iter()
     {
-        for (player,mapping_vals) in input_map.player_mappings.iter_mut() {
+        for (&player,mapping_vals) in player_mappings.iter_mut() {
             let Some(mapping_val)=mapping_vals.get_mut(&mapping) else {continue;};
 
             // let cur_val:f32=mapping_val.binding_vals.iter().map(|x|*x.1).sum();
@@ -804,7 +924,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                 mapping_val.repeat_time_accum+=time.delta_secs();
 
                 if mapping_val.repeat_time_accum>=duration {
-                    mapping_event_writer.send(InputMapEvent::Repeat { mapping: mapping.clone(), dir: cur_dir, delay: duration, player: player.0 });
+                    mapping_event_writer.send(InputMapEvent::Repeat { mapping: mapping.clone(), dir: cur_dir, delay: duration, player: player });
                     mapping_val.repeat_time_accum=0.0;
                     // let dif=mapping_val.repeat_time_accum-duration;
                     // mapping_val.repeat_time_accum=dif-(dif/duration)*duration;
@@ -820,7 +940,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
     // let mut player_bind_mode_bindings : HashMap<PlayerId,HashSet<(Device,Binding)>> = Default::default();
 
-    let mut bind_mode_bindings : HashSet<(Device,Binding)> = input_map.bind_mode_bindings.clone();
+    // let mut sbind_mode_bindings : HashSet<(Device,Binding)> = input_map.bind_mode_bindings.clone();
 
     //do bind mode
     for binding_input in binding_inputs.iter() {
@@ -834,9 +954,9 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
         {
             // let bind_mode_devices=input_map.player_bind_mode_devices.get(&player);
 
-            let is_bind_mode=input_map.bind_mode_devices.contains(&binding_input.device); //.unwrap_or_default();
+            let is_bind_mode=bind_mode_devices.contains(&binding_input.device); //.unwrap_or_default();
 
-            if !is_bind_mode || input_map.bind_mode_excludes.contains(&binding_input.binding) {
+            if !is_bind_mode || bind_mode_excludes.contains(&binding_input.binding) {
                 continue;
             }
 
@@ -852,22 +972,36 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
             let k=(binding_input.device,binding_input.binding);
             let has_binding = bind_mode_bindings.contains(&k);
 
+            let Some(player)=device_player.get(&binding_input.device).cloned() else {
+                continue;
+            };
+
             if binding_input.value!=0.0 && !has_binding {
                 // println!("a {:?} {:?} : {} {} : {bind_mode_bindings:?}",binding_input.device,binding_input.binding,binding_input.value, has_binding);
 
-                for &player in device_players.get(&binding_input.device).unwrap().iter() {
-                    mapping_event_writer.send(InputMapEvent::BindPressed{player:player.0,device:binding_input.device,binding:binding_input.binding});
-                }
+                // for &player in device_players.get(&binding_input.device).unwrap().iter() {
+                mapping_event_writer.send(InputMapEvent::BindPress{player:player,device:binding_input.device,binding:binding_input.binding});
+                // }
 
                 bind_mode_bindings.insert(k);
+
+                bind_mode_chain.entry(binding_input.device).or_default().push(binding_input.binding);
+
+
             } else if binding_input.value==0.0 && has_binding {
                 // println!("b {:?} {:?} : {} {} : {bind_mode_bindings:?}",binding_input.device,binding_input.binding,binding_input.value, has_binding);
 
-                for &player in device_players.get(&binding_input.device).unwrap().iter() {
-                    mapping_event_writer.send(InputMapEvent::BindReleased{player:player.0,device:binding_input.device,binding:binding_input.binding});
+                if let Some(chain_bindings)=bind_mode_chain.remove(&binding_input.device) {
+                    for &binding in chain_bindings.iter() {
+                        bind_mode_bindings.remove(&(binding_input.device,binding));
+                    }
+                    mapping_event_writer.send(InputMapEvent::BindRelease{player:player,device:binding_input.device,bindings:chain_bindings});
                 }
+                // for &player in device_players.get(&binding_input.device).unwrap().iter() {
+                // mapping_event_writer.send(InputMapEvent::BindRelease{player:player,device:binding_input.device,binding:binding_input.binding});
+                // }
 
-                bind_mode_bindings.remove(&k);
+                // bind_mode_bindings.remove(&k);
             } else {
 
                 // println!("c {:?} {:?} : {} {} : {bind_mode_bindings:?}",binding_input.device,binding_input.binding,binding_input.value, has_binding);
@@ -888,7 +1022,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
     }
 
     //store updated bind_mode_bindings
-    input_map.bind_mode_bindings=bind_mode_bindings;
+    // input_map.bind_mode_bindings=bind_mode_bindings;
 
     // for (player,bind_mode_bindings) in player_bind_mode_bindings {
     //     let x=input_map.player_bind_mode_bindings.entry(player).or_default();

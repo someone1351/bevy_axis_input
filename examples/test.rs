@@ -1,6 +1,8 @@
 
+use std::collections::{HashMap, HashSet};
+
 use bevy::prelude::*;
-use bevy_axis_input::{self as axis_input, Binding, SetMappingBind, SetMappingRepeat};
+use bevy_axis_input::{self as axis_input, Binding,  };
 use serde::Deserialize;
 
 #[derive(Clone,Debug,Deserialize,Hash,PartialEq,Eq,Ord,PartialOrd)]
@@ -12,43 +14,6 @@ pub enum Mapping {
     MenuUp,
 }
 
-#[derive(Resource,)]
-struct MappingBinds {
-    items : Vec<SetMappingBind<Mapping>>,
-    x_pos : SetMappingBind<Mapping>,
-    x_neg : SetMappingBind<Mapping>,
-    y : SetMappingBind<Mapping>,
-}
-
-impl Default for MappingBinds {
-    fn default() -> Self {
-        Self {
-            items: vec![
-                SetMappingBind{ mapping: Mapping::Quit, bindings: vec![Binding::Key(KeyCode::F4)], scale: 1.0, primary_dead: 0.0, modifier_dead: 0.0 },
-                SetMappingBind{ mapping: Mapping::MenuUp, bindings: vec![Binding::Key(KeyCode::ArrowUp)], scale: 1.0, primary_dead: 0.0, modifier_dead: 0.0 },
-                SetMappingBind{ mapping: Mapping::MenuUp, bindings: vec![Binding::Key(KeyCode::ArrowDown)], scale: -1.0, primary_dead: 0.0, modifier_dead: 0.0 },
-                SetMappingBind{ mapping: Mapping::MenuSelect, bindings: vec![Binding::Key(KeyCode::Enter)], scale: 1.0, primary_dead: 0.0, modifier_dead: 0.0 },
-                SetMappingBind{ mapping: Mapping::MenuCancel, bindings: vec![Binding::Key(KeyCode::Escape)], scale: 1.0, primary_dead: 0.0, modifier_dead: 0.0 },
-            ],
-            x_pos: SetMappingBind{ mapping: Mapping::X, bindings: vec![Binding::Key(KeyCode::KeyW)], scale: 1.0, primary_dead: 0.0, modifier_dead: 0.0 },
-            x_neg: SetMappingBind{ mapping: Mapping::X, bindings: vec![Binding::Key(KeyCode::KeyS)], scale: -1.0, primary_dead: 0.0, modifier_dead: 0.0 },
-            y: SetMappingBind{ mapping: Mapping::Y, bindings: vec![Binding::Key(KeyCode::Space)], scale: 1.0, primary_dead: 0.0, modifier_dead: 0.0 },
-        }
-    }
-}
-
-impl MappingBinds {
-    fn get_items(&self) -> Vec<SetMappingBind<Mapping>> {
-        let mut mapping_binds_items=self.items.clone();
-        mapping_binds_items.extend([
-            self.x_pos.clone(),
-            self.x_neg.clone(),
-            self.y.clone(),
-        ]);
-
-        mapping_binds_items
-    }
-}
 
 #[derive(Resource,Default)]
 struct Menu {
@@ -57,6 +22,19 @@ struct Menu {
     x_val : f32,
     y_val : f32,
     in_bind_mode:bool,
+}
+
+#[derive(Resource,)]
+struct CurBinds {
+    x_pos : Vec<Binding>,
+    x_neg : Vec<Binding>,
+    y : Vec<Binding>,
+}
+
+impl Default for CurBinds {
+    fn default() -> Self {
+        Self { x_pos: vec![Binding::Key(KeyCode::KeyW)], x_neg: vec![Binding::Key(KeyCode::KeyS)], y: vec![Binding::Key(KeyCode::Space)] }
+    }
 }
 
 fn main() {
@@ -78,7 +56,7 @@ fn main() {
                 axis_input::InputMapPlugin::<Mapping>::default(),
         ))
 
-        .init_resource::<MappingBinds>()
+        .init_resource::<CurBinds>()
         .init_resource::<Menu>()
 
         .add_systems(Startup, ( setup_input, setup_camera, setup_menu, ))
@@ -91,12 +69,16 @@ fn main() {
 
 fn setup_input(
     mut input_map: ResMut<axis_input::InputMap<Mapping>>,
-    mapping_binds : Res<MappingBinds>,
+    cur_binds : Res<CurBinds>,
 ) {
-    input_map.set_mapping_repeats([SetMappingRepeat{ mapping: Mapping::MenuUp, delay: 0.3 }]);
-    input_map.set_player_devices(0, [axis_input::Device::Other,axis_input::Device::Gamepad(0)]);
+    input_map.mapping_repeats=HashMap::from_iter([(Mapping::MenuUp, 0.3),]);
 
-    input_map.set_bind_mode_excludes([
+    input_map.device_player = HashMap::from_iter([
+        (axis_input::Device::Other, 0),
+        (axis_input::Device::Gamepad(0), 0),
+    ]);
+
+    input_map.bind_mode_excludes = HashSet::from_iter([
         Binding::Key(KeyCode::Escape),
         Binding::Key(KeyCode::F4),
         Binding::Key(KeyCode::ArrowUp),
@@ -110,14 +92,27 @@ fn setup_input(
         Binding::GamepadAxis(GamepadAxis::RightStickY),
     ]);
 
-    input_map.set_player_mapping_binds(0, mapping_binds.get_items());
+    input_map.player_bindings.entry(0).or_insert(HashMap::from_iter([
+        ((Mapping::Quit,vec![Binding::Key(KeyCode::F4)]),(1.0,0.0,0.0)),
+        ((Mapping::MenuUp,vec![Binding::Key(KeyCode::ArrowUp)]),(1.0,0.0,0.0)),
+        ((Mapping::MenuUp,vec![Binding::Key(KeyCode::ArrowDown)]),(-1.0,0.0,0.0)),
+        ((Mapping::MenuSelect,vec![Binding::Key(KeyCode::Enter)]),(1.0,0.0,0.0)),
+        ((Mapping::MenuCancel,vec![Binding::Key(KeyCode::Escape)]),(1.0,0.0,0.0)),
+
+        ((Mapping::X,cur_binds.x_pos.clone()),(1.0,0.0,0.0)),
+        ((Mapping::X,cur_binds.x_neg.clone()),(-1.0,0.0,0.0)),
+        ((Mapping::Y,cur_binds.y.clone()),(1.0,0.0,0.0)),
+    ]));
+
+    input_map.player_bindings_updated=true;
+
 }
 
 fn update_input(
     mut input_map_event: EventReader<axis_input::InputMapEvent<Mapping>>,
     mut exit: EventWriter<AppExit>,
     mut menu : ResMut<Menu>,
-    mut mapping_binds : ResMut<MappingBinds>,
+    mut cur_binds : ResMut<CurBinds>,
     mut input_map: ResMut<axis_input::InputMap<Mapping>>,
 ) {
     for ev in input_map_event.read() {
@@ -154,7 +149,9 @@ fn update_input(
                 if let Some(pressed)=menu.pressed {
                     match pressed {
                         0..=2 => { //X+ X- Y
-                            input_map.set_bind_mode_devices([axis_input::Device::Other,axis_input::Device::Gamepad(0)]);
+                            // input_map.set_bind_mode_devices([axis_input::Device::Other,axis_input::Device::Gamepad(0)]);
+
+                            input_map.bind_mode_devices=HashSet::from_iter([axis_input::Device::Other,axis_input::Device::Gamepad(0)]);
                             menu.in_bind_mode=true;
                             println!("bind mode start");
                         }
@@ -167,47 +164,67 @@ fn update_input(
                 menu.pressed=None;
             }
 
-            axis_input::InputMapEvent::BindPressed { player:0, binding, .. } => {
-                input_map.set_bind_mode_devices([]);
+            axis_input::InputMapEvent::BindRelease { player:0, bindings, .. } => {
+                // input_map.set_bind_mode_devices([]);
+                input_map.bind_mode_devices.clear();
                 menu.in_bind_mode=false;
 
-                match menu.cur_index {
-                    0 => { //X+
-                        mapping_binds.x_pos.bindings.clear();
-                        mapping_binds.x_pos.bindings.push(binding);
+                let (mapping,last_bind)=match menu.cur_index {
+                    0 => {
+                        let last_bind=cur_binds.x_pos.clone();
+                        cur_binds.x_pos=bindings.clone();
+                        (Mapping::X,last_bind)
+                    },
+                    1 => {
+                        let last_bind=cur_binds.x_neg.clone();
+                        cur_binds.x_neg=bindings.clone();
+                        (Mapping::X,last_bind)
+                    },
+                    2 => {
+                        let last_bind=cur_binds.y.clone();
+                        cur_binds.y=bindings.clone();
+                        (Mapping::Y,last_bind)
+                    },
+                    _ =>{
+                        continue;
                     }
-                    1 => { //X-
-                        mapping_binds.x_neg.bindings.clear();
-                        mapping_binds.x_neg.bindings.push(binding);
-                    }
-                    2 => { //Y
-                        mapping_binds.y.bindings.clear();
-                        mapping_binds.y.bindings.push(binding);
-                    }
-                    _=>{}
-                }
-                input_map.set_player_mapping_binds(0, mapping_binds.get_items());
+                };
+
+                let cur_bindings=input_map.player_bindings.get_mut(&0).unwrap();
+                let attribs=cur_bindings.remove(&(mapping.clone(),last_bind)).unwrap();
+                cur_bindings.insert((mapping,bindings.clone()), attribs);
+                input_map.player_bindings_updated=true;
+
             }
             axis_input::InputMapEvent::JustPressed{mapping:Mapping::MenuCancel, ..} => {
                 if menu.in_bind_mode {
-                    input_map.set_bind_mode_devices([]);
+                    // input_map.set_bind_mode_devices([]);
+                    input_map.bind_mode_devices.clear();
                     menu.in_bind_mode=false;
                 } else {
-                    match menu.cur_index {
-                        0 => { //X+
-                            mapping_binds.x_pos.bindings.clear();
-                            input_map.set_player_mapping_binds(0, mapping_binds.get_items());
+                    let (mapping,last_bind)=match menu.cur_index {
+                        0 => {
+                            let last_bind=cur_binds.x_pos.clone();
+                            cur_binds.x_pos=vec![];
+                            (Mapping::X,last_bind)
+                        },
+                        1 => {
+                            let last_bind=cur_binds.x_neg.clone();
+                            cur_binds.x_neg=vec![];
+                            (Mapping::X,last_bind)
+                        },
+                        2 => {
+                            let last_bind=cur_binds.y.clone();
+                            cur_binds.y=vec![];
+                            (Mapping::Y,last_bind)
+                        },
+                        _ =>{
+                            continue;
                         }
-                        1 => { //X-
-                            mapping_binds.x_neg.bindings.clear();
-                            input_map.set_player_mapping_binds(0, mapping_binds.get_items());
-                        }
-                        2 => { //Y
-                            mapping_binds.y.bindings.clear();
-                            input_map.set_player_mapping_binds(0, mapping_binds.get_items());
-                        }
-                        _ =>{}
-                    }
+                    };
+
+                    input_map.player_bindings.get_mut(&0).unwrap().remove(&(mapping,last_bind)).unwrap();
+                    input_map.player_bindings_updated=true;
                 }
             }
 
@@ -240,43 +257,43 @@ fn setup_menu(
         TextFont {font:font.clone(),font_size: 15.0,..default()},
     )).with_child((
         TextSpan::new("\n\n"),
-        TextFont {font:font.clone(),font_size: 25.0,..default()},
+        TextFont {font:font.clone(),font_size: 20.0,..default()},
     )).with_child((
     )).with_child((
         MenuItem(-1),
         TextSpan::new("values"),
         TextColor::from(bevy::color::palettes::css::WHITE),
-        TextFont {font:font.clone(),font_size: 25.0,..default()},
+        TextFont {font:font.clone(),font_size: 20.0,..default()},
     )).with_child((
         TextSpan::new("\n"),
-        TextFont {font:font.clone(),font_size: 25.0,..default()},
+        TextFont {font:font.clone(),font_size: 20.0,..default()},
     )).with_child((
         MenuItem(0),
         TextSpan::new("b\n"),
         TextColor::from(bevy::color::palettes::css::WHITE),
-        TextFont {font:font.clone(),font_size: 25.0,..default()},
+        TextFont {font:font.clone(),font_size: 20.0,..default()},
     )).with_child((
         MenuItem(1),
         TextSpan::new("b\n"),
         TextColor::from(bevy::color::palettes::css::WHITE),
-        TextFont {font:font.clone(),font_size: 25.0,..default()},
+        TextFont {font:font.clone(),font_size: 20.0,..default()},
     )).with_child((
         MenuItem(2),
         TextSpan::new("b\n"),
         TextColor::from(bevy::color::palettes::css::WHITE),
-        TextFont {font:font.clone(),font_size: 25.0,..default()},
+        TextFont {font:font.clone(),font_size: 20.0,..default()},
     )).with_child((
         MenuItem(3),
         TextSpan::new("Exit"),
         TextColor::from(bevy::color::palettes::css::WHITE),
-        TextFont {font:font.clone(),font_size: 25.0,..default()},
+        TextFont {font:font.clone(),font_size: 20.0,..default()},
     ));
 }
 
 fn show_menu(
     mut marker_query: Query<(&MenuItem, &mut TextSpan, &mut TextColor)>,
     menu : Res<Menu>,
-    mapping_binds : Res<MappingBinds>,
+    cur_binds : Res<CurBinds>,
 ) {
     for (item,mut text,mut col) in marker_query.iter_mut() {
 
@@ -303,7 +320,7 @@ fn show_menu(
                     if menu.in_bind_mode&&menu.cur_index==0 {
                         "...".to_string()
                     }else{
-                        mapping_binds.x_pos.bindings.first().map(|x|format!("{x:?}")).unwrap_or_default()
+                        format!("{:?}",cur_binds.x_pos)
                     }
                 );
             }
@@ -312,7 +329,7 @@ fn show_menu(
                     if menu.in_bind_mode&&menu.cur_index==1 {
                         "...".to_string()
                     }else{
-                        mapping_binds.x_neg.bindings.first().map(|x|format!("{x:?}")).unwrap_or_default()
+                        format!("{:?}",cur_binds.x_neg)
                     }
                 );
             }
@@ -321,7 +338,7 @@ fn show_menu(
                     if menu.in_bind_mode&&menu.cur_index==2 {
                         "...".to_string()
                     }else{
-                        mapping_binds.y.bindings.first().map(|x|format!("{x:?}")).unwrap_or_default()
+                        format!("{:?}",cur_binds.y)
                     }
                 );
             }

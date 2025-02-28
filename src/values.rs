@@ -7,8 +7,8 @@ use serde::Deserialize;
 
 
 
-#[derive(Hash, Eq, PartialEq, Clone, Copy,Debug)]
-pub(super)struct PlayerId(pub i32);
+// #[derive(Hash, Eq, PartialEq, Clone, Copy,Debug)]
+// pub(super) struct PlayerId(pub i32);
 
 // #[derive(Hash, Eq, PartialEq, Clone, Copy,Debug)]
 // pub struct GamepadId(pub usize);
@@ -22,7 +22,7 @@ pub enum Device {
 }
 
 #[derive(Clone, Hash, PartialEq, Eq,Debug)]
-pub(super)struct BindingGroup {
+pub(super) struct BindingGroup {
     pub modifiers : Vec<Binding>,
     pub primary : Binding,
 }
@@ -45,7 +45,7 @@ pub(super)struct MappingVal {
 }
 
 #[derive(Default,Clone)]
-pub(super)struct InputBindingDeadZone {
+pub struct InputDeviceDeadZone {
     pub pos_max : f32,
     pub pos_min : f32,
     pub neg_max: f32,
