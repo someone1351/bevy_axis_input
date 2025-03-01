@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use bevy::prelude::{ GamepadAxis, GamepadButton, KeyCode, MouseButton};
+use bevy::prelude::{ Entity, GamepadAxis, GamepadButton, KeyCode, MouseButton};
 
 use serde::Deserialize;
 
@@ -19,6 +19,7 @@ pub enum Device {
     // MouseKeyboard
     Other,
     Gamepad(usize), //GamepadId
+    Gamepad2(Entity), //GamepadId
 }
 
 #[derive(Clone, Hash, PartialEq, Eq,Debug)]
@@ -44,12 +45,12 @@ pub(super)struct MappingVal {
     pub repeating:bool,
 }
 
-#[derive(Default,Clone)]
-pub struct InputDeviceDeadZone {
-    pub pos_max : f32,
+#[derive(Default,Clone,Debug)]
+pub struct DeadZone {
     pub pos_min : f32,
-    pub neg_max: f32,
+    pub pos_max : f32,
     pub neg_min : f32,
+    pub neg_max: f32,
 }
 
 #[derive(Clone,Debug)]

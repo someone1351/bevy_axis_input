@@ -9,7 +9,7 @@ use super::resources::*;
 use super::events::*;
 use super::values::*;
 
-fn use_dead_zone(value:f32,dead_zone:Option<&InputDeviceDeadZone>) -> f32 {
+fn use_dead_zone(value:f32,dead_zone:Option<&DeadZone>) -> f32 {
     let Some(dead_zone)=dead_zone else {
         return value;
     };

@@ -23,11 +23,10 @@ use super::values::*;
 pub struct InputMap<M:Eq> {
     // pub player_bindings : HashMap<PlayerId,HashMap<(M,BindingGroup),(f32,f32,f32)>>, //[player][mapping,bind_group]=(scale,primary_dead,modifier_dead)
     pub player_bindings : HashMap<i32,HashMap<(M,Vec<Binding>),(f32,f32,f32)>>, //[player][mapping,bindings]=(scale,primary_dead,modifier_dead)
-
     pub player_bindings_updated :bool,
 
     pub mapping_repeats : HashMap<M,f32>, //[mapping]=repeat //
-    pub device_dead_zones : HashMap<(Device,Binding),InputDeviceDeadZone>, //
+    pub device_dead_zones : HashMap<(Device,Binding),DeadZone>, //
 
     // pub(super) player_mappings : HashMap<i32, HashMap<M,MappingVal>>, //[player][mapping]=mapping_val
     // pub(super) player_primary_mappings : HashMap<i32, HashMap<Binding,HashSet<(M,BindingGroup)>>>, //[player][primary_binding][(mapping,binding_group)]
