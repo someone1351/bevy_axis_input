@@ -2,7 +2,7 @@
 use std::collections::{ HashMap, HashSet};
 // use std::fmt::Debug;
 use bevy::ecs::system::Resource;
-use bevy::prelude::Entity;
+// use bevy::prelude::Entity;
 // use bevy::prelude::IntoSystem;
 
 use super::values::*;
@@ -28,10 +28,10 @@ pub struct InputMap<M:Eq> {
     pub bind_mode_start_dead:f32,
     pub bind_mode_end_dead:f32,
 
-    // pub device_player : HashMap::<Device,i32>,
-    // pub bind_mode_devices:HashSet<Device>, //
-    pub(super) gamepad_devices:Vec<Option<(Entity,String,Option<u16>,Option<u16>)>>,
-    pub(super) gamepad_device_entity_map:HashMap<Entity,usize>,
+    // // pub device_player : HashMap::<Device,i32>,
+    // // pub bind_mode_devices:HashSet<Device>, //
+    // pub(super) gamepad_devices:Vec<Option<(Entity,String,Option<u16>,Option<u16>)>>,
+    // pub(super) gamepad_device_entity_map:HashMap<Entity,usize>,
 
 
     pub bind_mode_kbm:bool,
@@ -48,10 +48,10 @@ impl<M:Eq> Default for InputMap<M> {
             bind_mode_end_dead:0.2,
             bind_mode_excludes:HashSet::new(),
 
-            // device_player:HashMap::new(),
-            // bind_mode_devices: HashSet::new(),
-            gamepad_devices:Vec::new(),
-            gamepad_device_entity_map:HashMap::new(),
+            // // device_player:HashMap::new(),
+            // // bind_mode_devices: HashSet::new(),
+            // gamepad_devices:Vec::new(),
+            // gamepad_device_entity_map:HashMap::new(),
 
             bind_mode_kbm: false,
             kbm_owner: 0,

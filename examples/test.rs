@@ -1,7 +1,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use bevy::{input::gamepad::{GamepadConnection, GamepadConnectionEvent, GamepadEvent}, prelude::*};
+use bevy::{input::gamepad::GamepadEvent, prelude::*};
 use bevy_axis_input::{self as axis_input, Binding,  };
 use serde::Deserialize;
 
@@ -90,6 +90,13 @@ fn setup_input(
         Binding::GamepadAxis(GamepadAxis::LeftStickY),
         Binding::GamepadAxis(GamepadAxis::RightStickX),
         Binding::GamepadAxis(GamepadAxis::RightStickY),
+
+        Binding::MouseMoveX,
+        Binding::MouseMoveY,
+        Binding::MouseMovePosX,
+        Binding::MouseMovePosY,
+        Binding::MouseMoveNegX,
+        Binding::MouseMoveNegY,
     ]);
 
     input_map.player_bindings.entry(0).or_insert(HashMap::from_iter([
@@ -115,34 +122,44 @@ fn update_input(
     mut cur_binds : ResMut<CurBinds>,
     mut input_map: ResMut<axis_input::InputMap<Mapping>>,
 
-    mut gamepad_events: EventReader<GamepadEvent>,
+    // mut gamepad_events: EventReader<GamepadEvent>,
     mut commands: Commands,
 
 
     gamepad_owner_query: Query<(Entity,&axis_input::GamepadOwner,)>,
 
+    gamepad_ownerless_query:Query<Entity,(With<Gamepad>,Without<axis_input::GamepadOwner>)>,
+    // gamepad_query:Query<Entity,With<Gamepad>>,
 ) {
-    for event in gamepad_events.read() {
-        match event {
-            GamepadEvent::Connection(GamepadConnectionEvent{gamepad,connection:GamepadConnection::Connected {name, ..}})=> {
-                println!("Gamepad connected: {gamepad} {name:?}");
-                commands.entity(*gamepad).entry().or_insert(axis_input::GamepadOwner(0));
-            }
-            GamepadEvent::Connection(GamepadConnectionEvent{gamepad,connection:GamepadConnection::Disconnected})=> {
-                println!("Gamepad disconnected: {gamepad}");
-            }
-            _ => {}
-        }
+    // println!("gamepad_owner_query {}",gamepad_owner_query.iter().count());
+    // println!("gamepad_ownerless_query {}",gamepad_ownerless_query.iter().count());
+    // println!("gamepad_query {}",gamepad_query.iter().count());
+
+    for entity in gamepad_ownerless_query.iter() {
+        commands.entity(entity).insert(axis_input::GamepadOwner(0));
     }
+    // for event in gamepad_events.read() {
+    //     match event {
+    //         GamepadEvent::Connection(GamepadConnectionEvent{gamepad,connection:GamepadConnection::Connected {name, ..}})=> {
+    //             println!("Gamepad connected: {gamepad} {name:?}");
+    //             // commands.entity(*gamepad).entry().or_insert(axis_input::GamepadOwner(0));
+    //             commands.entity(*gamepad).insert(axis_input::GamepadOwner(0));
+    //         }
+    //         GamepadEvent::Connection(GamepadConnectionEvent{gamepad,connection:GamepadConnection::Disconnected})=> {
+    //             println!("Gamepad disconnected: {gamepad}");
+    //         }
+    //         _ => {}
+    //     }
+    // }
 
     for ev in input_map_event.read() {
         match ev.clone() {
-            axis_input::InputMapEvent::GamepadConnect { entity, index, name, vendor_id, product_id } => {
-                println!("Gamepad connected: {entity} {index} {name:?} {vendor_id:?} {product_id:?}");
-            }
-            axis_input::InputMapEvent::GamepadDisconnect { entity, index, name, vendor_id, product_id } => {
-                println!("Gamepad disconnected: {entity} {index} {name:?} {vendor_id:?} {product_id:?}");
-            }
+            // axis_input::InputMapEvent::GamepadConnect { entity, index, name, vendor_id, product_id } => {
+            //     println!("Gamepad connected: {entity} {index} {name:?} {vendor_id:?} {product_id:?}");
+            // }
+            // axis_input::InputMapEvent::GamepadDisconnect { entity, index, name, vendor_id, product_id } => {
+            //     println!("Gamepad disconnected: {entity} {index} {name:?} {vendor_id:?} {product_id:?}");
+            // }
             axis_input::InputMapEvent::ValueChanged { mapping:Mapping::X, val, .. } => {
                 menu.x_val=val;
             }
@@ -174,8 +191,12 @@ fn update_input(
                             // input_map.bind_mode_devices=HashSet::from_iter([axis_input::Device::Other,axis_input::Device::Gamepad(0)]); //todo!
 
                             if let Ok((entity,_owner)) = gamepad_owner_query.get_single() {
-                                commands.entity(entity).entry::<axis_input::GamepadBindMode>().and_modify(|mut c|{c.0=true;});
+                                // commands.entity(entity).entry::<axis_input::GamepadBindMode>().and_modify(|mut c|{c.0=true;});
+
+                                commands.entity(entity).insert(axis_input::GamepadBindMode(true));
+                                // println!("ok!");
                             }
+                                input_map.bind_mode_kbm=true;
                             // commands.entity(entity)
 
                             menu.in_bind_mode=true;
@@ -194,9 +215,12 @@ fn update_input(
                 // input_map.set_bind_mode_devices([]);
                 // input_map.bind_mode_devices.clear(); //todo!
 
-                if let Ok((entity,_owner)) = gamepad_owner_query.get_single() {
+                if let Ok((entity,_owner)) = gamepad_owner_query.get_single()
+
+                {
                     commands.entity(entity).entry::<axis_input::GamepadBindMode>().and_modify(|mut c|{c.0=false;});
                 }
+                input_map.bind_mode_kbm=false;
 
                 menu.in_bind_mode=false;
 
@@ -235,6 +259,7 @@ fn update_input(
                     if let Ok((entity,_owner)) = gamepad_owner_query.get_single() {
                         commands.entity(entity).entry::<axis_input::GamepadBindMode>().and_modify(|mut c|{c.0=false;});
                     }
+                    input_map.bind_mode_kbm=false;
 
                     menu.in_bind_mode=false;
                 } else {

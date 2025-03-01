@@ -18,8 +18,8 @@ pub enum Device {
     // Touch,
     // MouseKeyboard
     Other,
-    Gamepad(usize), //GamepadId
-    Gamepad2(Entity), //GamepadId
+    // Gamepad(usize), //GamepadId
+    Gamepad(Entity), //GamepadId
 }
 
 #[derive(Clone, Hash, PartialEq, Eq,Debug)]

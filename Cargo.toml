@@ -9,7 +9,7 @@ serde = { version = "1.0", features = ["derive"] }
 ron = "0.8.1"
 
 [dev-dependencies]
-bevy = { version = "0.15.0", default-features = false, features = ["bevy_window","x11","bevy_asset","bevy_render","bevy_text","bevy_ui"] }
+bevy = { version = "0.15.0", default-features = false, features = ["bevy_window","x11","bevy_asset","bevy_render","bevy_text","bevy_ui","bevy_gilrs"] }
 
 [lib]
 name = "bevy_axis_input"

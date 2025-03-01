@@ -1,7 +1,12 @@
+/*
+* slight problem with bind mode, on multiple keys
+** sometimes if one key released and then another pressed, will count as both pressed
+*** could check when one is released, check if the other(s) were just pressed, and if so ignore them
 
+*/
 use std::{collections::{HashMap, HashSet}, fmt::Debug, hash::Hash};
 
-use bevy::{ecs::prelude::*, prelude::GamepadAxis};
+use bevy::{ecs::prelude::*, prelude::{Gamepad, GamepadAxis}};
 use bevy::input::gamepad::{GamepadAxisChangedEvent, GamepadButtonChangedEvent, GamepadConnection, GamepadConnectionEvent, GamepadEvent,};
 use bevy::input::keyboard::KeyCode;
 
@@ -47,13 +52,13 @@ pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug>
     mut mouse_scroll_events: EventReader<bevy::input::mouse::MouseWheel>,
     mut mouse_button_events : EventReader<bevy::input::mouse::MouseButtonInput>,
 
-    mut input_map : ResMut<InputMap<M>>,
+    // mut input_map : ResMut<InputMap<M>>,
 
     mut gamepad_axis_lasts : Local<HashMap<(Device,GamepadAxis),f32>>,
     mut key_lasts : Local<HashSet<KeyCode>>,
 
     mut binding_input_event_writer: EventWriter<BindingInputEvent>,
-    mut mapping_event_writer: EventWriter<InputMapEvent<M>>,
+    // mut mapping_event_writer: EventWriter<InputMapEvent<M>>,
 
     gamepad_dead_zones_query: Query<& GamepadDeadZone>,
 ) {
@@ -62,47 +67,50 @@ pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug>
         let immediate=false;
 
         match event {
-            GamepadEvent::Connection(GamepadConnectionEvent{gamepad,connection:GamepadConnection::Connected {
-                name, vendor_id, product_id
-            }})=> {
-                //println!("{gamepad} {name:?} Connected", );
+            // GamepadEvent::Connection(GamepadConnectionEvent{gamepad,connection:GamepadConnection::Connected {
+            //     name, vendor_id, product_id
+            // }})=> {
+            //     //println!("{gamepad} {name:?} Connected", );
 
-                let mut device_index=None;
+            //     // let mut device_index=None;
 
-                for (i,x) in input_map.gamepad_devices.iter().enumerate() {
-                    if x.is_none() {
-                        device_index=Some(i);
-                    }
-                }
+            //     // for (i,x) in input_map.gamepad_devices.iter().enumerate() {
+            //     //     if x.is_none() {
+            //     //         device_index=Some(i);
+            //     //     }
+            //     // }
 
-                if device_index.is_none() {
-                    device_index=Some(input_map.gamepad_devices.len());
-                    input_map.gamepad_devices.push(None);
-                }
+            //     // if device_index.is_none() {
+            //     //     device_index=Some(input_map.gamepad_devices.len());
+            //     //     input_map.gamepad_devices.push(None);
+            //     // }
 
-                *input_map.gamepad_devices.get_mut(device_index.unwrap()).unwrap()=Some((*gamepad,name.clone(),*vendor_id,*product_id));
-                input_map.gamepad_device_entity_map.insert(*gamepad, device_index.unwrap());
+            //     // *input_map.gamepad_devices.get_mut(device_index.unwrap()).unwrap()=Some((*gamepad,name.clone(),*vendor_id,*product_id));
+            //     // input_map.gamepad_device_entity_map.insert(*gamepad, device_index.unwrap());
 
-                //
-                mapping_event_writer.send(InputMapEvent::GamepadConnect{entity:*gamepad,index:device_index.unwrap(),name:name.clone(),vendor_id:*vendor_id, product_id:*product_id});
+            //     //
+            //     // mapping_event_writer.send(InputMapEvent::GamepadConnect{entity:*gamepad,index:device_index.unwrap(),name:name.clone(),vendor_id:*vendor_id, product_id:*product_id});
 
-            }
-            GamepadEvent::Connection(GamepadConnectionEvent{gamepad,connection:GamepadConnection::Disconnected})=> {
-                //println!("{:?} Disconnected", gamepad);
+            // }
+            // GamepadEvent::Connection(GamepadConnectionEvent{gamepad,connection:GamepadConnection::Disconnected})=> {
+            //     //println!("{:?} Disconnected", gamepad);
 
-                let &index=input_map.gamepad_device_entity_map.get(gamepad).unwrap();
-                let (_,name,vendor_id,product_id) = input_map.gamepad_devices.get(index).cloned().unwrap().unwrap();
+            //     // let &index=input_map.gamepad_device_entity_map.get(gamepad).unwrap();
+            //     // let (_,name,vendor_id,product_id) = input_map.gamepad_devices.get(index).cloned().unwrap().unwrap();
 
-                mapping_event_writer.send(InputMapEvent::GamepadDisconnect{entity:*gamepad,index,name,vendor_id, product_id});
+            //     // mapping_event_writer.send(InputMapEvent::GamepadDisconnect{entity:*gamepad,index,name,vendor_id, product_id});
 
-                // let i =input_map.gamepad_device_entity_map.remove(gamepad).unwrap();
-                // *input_map.gamepad_devices.get_mut(i).unwrap()=None;
-                //removal is done in system below
+            //     // // let i =input_map.gamepad_device_entity_map.remove(gamepad).unwrap();
+            //     // // *input_map.gamepad_devices.get_mut(i).unwrap()=None;
+            //     // //removal is done in system below
+            // }
+            GamepadEvent::Connection(..) => {
+
             }
             GamepadEvent::Button(GamepadButtonChangedEvent {value, entity, button:button_type, .. })=> {
                 let entity=*entity;
-                let device=Device::Gamepad(input_map.gamepad_device_entity_map.get(&entity).cloned().unwrap());
-                // let device=Device::Gamepad2(entity);
+                // let device=Device::Gamepad(input_map.gamepad_device_entity_map.get(&entity).cloned().unwrap());
+                let device=Device::Gamepad(entity);
                 let binding=Binding::GamepadButton(*button_type);
 
                 // let dead_zone=input_map.device_dead_zones.get(&(device,binding));
@@ -115,7 +123,8 @@ pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug>
             GamepadEvent::Axis(GamepadAxisChangedEvent {value, entity, axis:axis_type })=> {
                 let entity=*entity;
                 let axis_type=*axis_type;
-                let device=Device::Gamepad(input_map.gamepad_device_entity_map.get(&entity).cloned().unwrap());
+                // let device=Device::Gamepad(input_map.gamepad_device_entity_map.get(&entity).cloned().unwrap());
+                let device=Device::Gamepad(entity);
                 let binding=Binding::GamepadAxis(axis_type);
 
                 // let dead_zone=input_map.device_dead_zones.get(&(device,binding));
@@ -329,7 +338,10 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
     mut bind_mode_bindings:Local<HashSet<(Device,Binding)>>,
     mut bind_mode_chain:Local<HashMap<Device,Vec<Binding>>>,
 
-    gamepad_query: Query<(Entity,Option<& GamepadOwner>,Option<&GamepadBindMode>),Or<(With<GamepadOwner>,With<GamepadBindMode>)>>,
+    gamepad_query: Query<(Entity,Option<& GamepadOwner>,Option<&GamepadBindMode>),With<Gamepad>>,
+    // gamepad_query: Query<(Entity,Option<& GamepadOwner>,Option<&GamepadBindMode>),Or<(With<GamepadOwner>,With<GamepadBindMode>)>>,
+    // gamepad_query2: Query<(Entity,&GamepadBindMode),>,
+    mut device_prev_owners : Local<HashMap<Device,i32>>,
 ) {
 
     let InputMap {
@@ -342,9 +354,9 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
         // bind_mode_devices,
         // bind_mode_bindings,
         // bind_mode_start_dead, bind_mode_end_dead,
-        gamepad_devices, gamepad_device_entity_map,
+        // gamepad_devices, gamepad_device_entity_map,
         // bind_mode_chain,
-
+        bind_mode_start_dead,bind_mode_end_dead,
         kbm_owner,bind_mode_kbm,
         ..
     }=input_map.as_mut();
@@ -355,7 +367,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
     for (entity,owner,_) in gamepad_query.iter() {
         let Some(player)=owner.map(|x|x.0) else {continue;};
-        let device=Device::Gamepad2(entity);
+        let device=Device::Gamepad(entity);
         device_player.insert(device,player);
     }
 
@@ -367,13 +379,23 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
         bind_mode_devices.insert(Device::Other);
     }
 
+    // for (entity,bind_mode) in gamepad_query2.iter() {
+
+    //     // if bind_mode.0
+    //     {
+    //         bind_mode_devices.insert(Device::Gamepad2(entity));
+    //     }
+    // }
+
     for (entity,_,bind_mode) in gamepad_query.iter() {
         if let Some(bind_mode)=bind_mode {
             if bind_mode.0 {
-                bind_mode_devices.insert(Device::Gamepad2(entity));
+                bind_mode_devices.insert(Device::Gamepad(entity));
             }
         }
     }
+
+    // println!("{bind_mode_devices:?}");
 
     //
     let mut player_bind_mode_devices:HashMap<i32,HashSet<Device>> = HashMap::new();
@@ -391,6 +413,42 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
     }
 
     //
+    let mut device_removeds: HashSet<(Device, i32)> = HashSet::new();
+
+    //need to handle kbm that has player removed from it
+    {
+        let device=Device::Other;
+        let last_owner=device_prev_owners.get(&device).cloned().unwrap_or(0);
+        let cur_owner=*kbm_owner;
+
+        if last_owner!=cur_owner {
+            device_prev_owners.insert(device, cur_owner);
+            device_removeds.insert((device,last_owner));
+        }
+    }
+
+    //need to handle gamepad that has player removed from it
+    for (entity,owner,_bind_mode) in gamepad_query.iter() {
+        let device=Device::Gamepad(entity);
+        let last_owner=device_prev_owners.get(&device).cloned();
+        let cur_owner=owner.map(|x|x.0);
+
+        if last_owner!=cur_owner {
+            if let Some(cur_owner)=cur_owner {
+                device_prev_owners.insert(device, cur_owner);
+            } else {
+                device_prev_owners.remove(&device).unwrap();
+            }
+
+            if let Some(last_owner)=last_owner {
+                device_removeds.insert((device,last_owner));
+            }
+        }
+    }
+    //
+
+    //on mappings/bindings updated
+    //send events for removed mappings ending? also bindings?
     if *player_bindings_updated {
         *player_bindings_updated=false;
 
@@ -504,19 +562,21 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
     let mut player_mapping_binding_vals : HashMap<(i32,M),HashMap<(Device,BindingGroup),f32>> = Default::default();
     let mut not_repeatings : HashSet<(i32, M)> = Default::default();
 
+
     //release inputs of disconnected gamepad (todo)
     for event in gamepad_events.read() {
         let GamepadEvent::Connection(GamepadConnectionEvent{gamepad,connection:GamepadConnection::Disconnected})=event else {
             continue;
         };
 
-        let gamepad_device=Device::Gamepad(gamepad_device_entity_map.get(gamepad).cloned().unwrap());
+        // let gamepad_device=Device::Gamepad(gamepad_device_entity_map.get(gamepad).cloned().unwrap());
+        let gamepad_device=Device::Gamepad(*gamepad);
 
         //
-        {
-            let i =gamepad_device_entity_map.remove(gamepad).unwrap();
-            *gamepad_devices.get_mut(i).unwrap()=None;
-        }
+        // {
+        //     let i =gamepad_device_entity_map.remove(gamepad).unwrap();
+        //     *gamepad_devices.get_mut(i).unwrap()=None;
+        // }
 
         //
         // let Some(players)=device_players.get(&gamepad_device) else {
@@ -527,6 +587,11 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
             continue;
         };
 
+        device_removeds.insert((gamepad_device,player));
+    }
+
+    for (device, player) in device_removeds {
+        // continue;
         // for &player in players.iter()
         {
             let Some(mappings)=player_mappings.get(&player) else {
@@ -545,8 +610,8 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                 let last_dir=if last_val>0.0{1}else if last_val<0.0{-1}else{0};
 
                 //
-                binding_vals.retain(|(device,_bind_group),_binding_val|{
-                    if gamepad_device==*device {
+                binding_vals.retain(|(device2,_bind_group),_binding_val|{
+                    if device==*device2 {
                         false
                     } else {
                         true
@@ -576,7 +641,6 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
             }
         }
     }
-
     //
     let binding_inputs=binding_input_events.read().map(|&x|x).collect::<Vec<_>>();
 
@@ -653,7 +717,6 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
         // }
     }
 
-    //
     //on binding release, check all pressed binggroups, that use that modifier and remove/depress them
     for binding_input in binding_inputs.iter() {
         //
@@ -948,10 +1011,10 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
     }
 
     //
-    let mapping_repeats=mapping_repeats.clone();
+    // let mapping_repeats=mapping_repeats.clone();
 
     //do repeatings
-    for (mapping,repeat_time) in mapping_repeats //input_map.mapping_repeats.iter()
+    for (mapping,&repeat_time) in mapping_repeats.iter() //input_map.mapping_repeats.iter()
     {
         for (&player,mapping_vals) in player_mappings.iter_mut() {
             let Some(mapping_val)=mapping_vals.get_mut(&mapping) else {continue;};
@@ -1026,7 +1089,10 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                 continue;
             };
 
-            if binding_input.value!=0.0 && !has_binding {
+            if !has_binding &&
+                // binding_input.value!=0.0
+                binding_input.value.abs()>*bind_mode_start_dead
+            {
                 // println!("a {:?} {:?} : {} {} : {bind_mode_bindings:?}",binding_input.device,binding_input.binding,binding_input.value, has_binding);
 
                 // for &player in device_players.get(&binding_input.device).unwrap().iter() {
@@ -1038,7 +1104,10 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                 bind_mode_chain.entry(binding_input.device).or_default().push(binding_input.binding);
 
 
-            } else if binding_input.value==0.0 && has_binding {
+            } else if has_binding &&
+                // binding_input.value==0.0
+                binding_input.value.abs()<*bind_mode_end_dead
+            {
                 // println!("b {:?} {:?} : {} {} : {bind_mode_bindings:?}",binding_input.device,binding_input.binding,binding_input.value, has_binding);
 
                 if let Some(chain_bindings)=bind_mode_chain.remove(&binding_input.device) {
