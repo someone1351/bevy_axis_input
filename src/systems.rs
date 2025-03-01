@@ -3,6 +3,8 @@
 ** sometimes if one key released and then another pressed, will count as both pressed
 *** could check when one is released, check if the other(s) were just pressed, and if so ignore them
 
+* if same bindgroup bound to multiple mappings, then when pressed, only one of the mappings will receive the input, is that a problem?
+** makes sense that the more modifiers a bindgroup has, that it will be used for input, but what about exact same?
 */
 use std::{collections::{HashMap, HashSet}, fmt::Debug, hash::Hash};
 

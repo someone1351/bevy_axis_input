@@ -1,7 +1,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use bevy::{input::gamepad::GamepadEvent, prelude::*};
+use bevy::prelude::*;
 use bevy_axis_input::{self as axis_input, Binding,  };
 use serde::Deserialize;
 
