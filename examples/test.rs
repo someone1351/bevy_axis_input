@@ -1,7 +1,7 @@
 
 use std::collections::{HashMap, HashSet};
 
-use bevy::prelude::*;
+use bevy::{input::gamepad::{GamepadConnection, GamepadConnectionEvent, GamepadEvent}, prelude::*};
 use bevy_axis_input::{self as axis_input, Binding,  };
 use serde::Deserialize;
 
@@ -114,7 +114,23 @@ fn update_input(
     mut menu : ResMut<Menu>,
     mut cur_binds : ResMut<CurBinds>,
     mut input_map: ResMut<axis_input::InputMap<Mapping>>,
+
+    mut gamepad_events: EventReader<GamepadEvent>,
+    mut commands: Commands,
 ) {
+    for event in gamepad_events.read() {
+        match event {
+            GamepadEvent::Connection(GamepadConnectionEvent{gamepad,connection:GamepadConnection::Connected {name, ..}})=> {
+                println!("Gamepad connected: {gamepad} {name:?}");
+                commands.entity(*gamepad).entry().or_insert(axis_input::GamepadOwner(0));
+            }
+            GamepadEvent::Connection(GamepadConnectionEvent{gamepad,connection:GamepadConnection::Disconnected})=> {
+                println!("Gamepad disconnected: {gamepad}");
+            }
+            _ => {}
+        }
+    }
+
     for ev in input_map_event.read() {
         match ev.clone() {
             axis_input::InputMapEvent::GamepadConnect { entity, index, name, vendor_id, product_id } => {

@@ -21,36 +21,21 @@ use super::values::*;
 #[derive(Resource)]
 
 pub struct InputMap<M:Eq> {
-    // pub player_bindings : HashMap<PlayerId,HashMap<(M,BindingGroup),(f32,f32,f32)>>, //[player][mapping,bind_group]=(scale,primary_dead,modifier_dead)
     pub player_bindings : HashMap<i32,HashMap<(M,Vec<Binding>),(f32,f32,f32)>>, //[player][mapping,bindings]=(scale,primary_dead,modifier_dead)
     pub player_bindings_updated :bool,
+    pub mapping_repeats : HashMap<M,f32>,
+    pub bind_mode_excludes : HashSet<Binding>,
+    pub bind_mode_start_dead:f32,
+    pub bind_mode_end_dead:f32,
 
-    pub mapping_repeats : HashMap<M,f32>, //[mapping]=repeat //
-    // pub device_dead_zones : HashMap<(Device,Binding),DeadZone>, //
-
-    // pub(super) player_mappings : HashMap<i32, HashMap<M,MappingVal>>, //[player][mapping]=mapping_val
-    // pub(super) player_primary_mappings : HashMap<i32, HashMap<Binding,HashSet<(M,BindingGroup)>>>, //[player][primary_binding][(mapping,binding_group)]
-    // pub(super) player_modifier_mappings : HashMap<i32, HashMap<Binding,HashSet<(M,BindingGroup)>>>, //[player][modifier_binding][(mapping,binding_group)]
-
-
-    // pub player_devices : HashMap<PlayerId,HashSet<Device>>, //[player]=devices //
     pub device_player : HashMap::<Device,i32>,
-    pub bind_mode_excludes : HashSet<Binding>, //[binding] //
-
-    // pub(super) bind_mode_enabled:bool,
-
-    //
     pub bind_mode_devices:HashSet<Device>, //
-    // pub(super) bind_mode_bindings:HashSet<(Device,Binding)>,
-    // pub(super) bind_mode_chain:HashMap<Device,Vec<Binding>>,
-
-    pub bind_mode_start_dead:f32, //
-    pub bind_mode_end_dead:f32, //
-
-    //
-
     pub(super) gamepad_devices:Vec<Option<(Entity,String,Option<u16>,Option<u16>)>>,
     pub(super) gamepad_device_entity_map:HashMap<Entity,usize>,
+
+
+    pub bind_mode_kbm:bool,
+    pub kbm_owner:i32,
 }
 
 impl<M:Eq> Default for InputMap<M> {
@@ -59,23 +44,17 @@ impl<M:Eq> Default for InputMap<M> {
             player_bindings: Default::default(),
             player_bindings_updated: Default::default(),
             mapping_repeats:HashMap::new(),
-            // player_mappings : HashMap::new(),
-            // player_primary_mappings : HashMap::new(),
-            // player_modifier_mappings : HashMap::new(),
-            // player_devices : HashMap::new(),
-            device_player:HashMap::new(),
-            // device_dead_zones : HashMap::new(),
-            // bind_mode_enabled:false,
-            // player_bind_mode_devices: HashMap::new(),
-            bind_mode_devices: HashSet::new(),
-            // player_bind_mode_bindings: HashMap::new(),
-            // bind_mode_bindings: HashSet::new(),
-            // bind_mode_chain:Default::default(),
             bind_mode_start_dead:0.4,
             bind_mode_end_dead:0.2,
             bind_mode_excludes:HashSet::new(),
+
+            device_player:HashMap::new(),
+            bind_mode_devices: HashSet::new(),
             gamepad_devices:Vec::new(),
             gamepad_device_entity_map:HashMap::new(),
+
+            bind_mode_kbm: false,
+            kbm_owner: 0,
         }
     }
 }
