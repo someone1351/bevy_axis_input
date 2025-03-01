@@ -91,6 +91,9 @@ fn setup_input(
         Binding::GamepadAxis(GamepadAxis::RightStickX),
         Binding::GamepadAxis(GamepadAxis::RightStickY),
 
+        Binding::GamepadButton(GamepadButton::Select),
+        Binding::GamepadButton(GamepadButton::Start),
+
         Binding::MouseMoveX,
         Binding::MouseMoveY,
         Binding::MouseMovePosX,
@@ -103,8 +106,15 @@ fn setup_input(
         ((Mapping::Quit,vec![Binding::Key(KeyCode::F4)]),(1.0,0.0,0.0)),
         ((Mapping::MenuUp,vec![Binding::Key(KeyCode::ArrowUp)]),(1.0,0.0,0.0)),
         ((Mapping::MenuUp,vec![Binding::Key(KeyCode::ArrowDown)]),(-1.0,0.0,0.0)),
+        ((Mapping::MenuUp,vec![Binding::GamepadButton(GamepadButton::DPadUp)]),(1.0,0.0,0.0)),
+        ((Mapping::MenuUp,vec![Binding::GamepadButton(GamepadButton::DPadDown)]),(-1.0,0.0,0.0)),
+        ((Mapping::MenuUp,vec![Binding::GamepadAxis(GamepadAxis::LeftStickY)]),(1.0,0.0,0.0)),
+        ((Mapping::MenuUp,vec![Binding::GamepadAxis(GamepadAxis::RightStickY)]),(1.0,0.0,0.0)),
         ((Mapping::MenuSelect,vec![Binding::Key(KeyCode::Enter)]),(1.0,0.0,0.0)),
+        ((Mapping::MenuSelect,vec![Binding::GamepadButton(GamepadButton::South)]),(1.0,0.0,0.0)),
+        ((Mapping::MenuSelect,vec![Binding::GamepadButton(GamepadButton::Start)]),(1.0,0.0,0.0)),
         ((Mapping::MenuCancel,vec![Binding::Key(KeyCode::Escape)]),(1.0,0.0,0.0)),
+        ((Mapping::MenuCancel,vec![Binding::GamepadButton(GamepadButton::Select)]),(1.0,0.0,0.0)),
 
         ((Mapping::X,cur_binds.x_pos.clone()),(1.0,0.0,0.0)),
         ((Mapping::X,cur_binds.x_neg.clone()),(-1.0,0.0,0.0)),
@@ -114,6 +124,9 @@ fn setup_input(
     input_map.player_bindings_updated=true;
 
 }
+
+// #[derive(Resource)]
+// struct CurBindModeBinds(Vec<Binding>);
 
 fn update_input(
     mut input_map_event: EventReader<axis_input::InputMapEvent<Mapping>>,
@@ -130,6 +143,8 @@ fn update_input(
 
     gamepad_ownerless_query:Query<Entity,(With<Gamepad>,Without<axis_input::GamepadOwner>)>,
     // gamepad_query:Query<Entity,With<Gamepad>>,
+
+    // mut cur_bind_mode_binds : ResMut<CurBindModeBinds>,
 ) {
     // println!("gamepad_owner_query {}",gamepad_owner_query.iter().count());
     // println!("gamepad_ownerless_query {}",gamepad_ownerless_query.iter().count());
@@ -211,6 +226,8 @@ fn update_input(
                 menu.pressed=None;
             }
 
+            axis_input::InputMapEvent::BindPress { player, device, bindings } => {
+            }
             axis_input::InputMapEvent::BindRelease { player:0, bindings, .. } => {
                 // input_map.set_bind_mode_devices([]);
                 // input_map.bind_mode_devices.clear(); //todo!
@@ -355,7 +372,25 @@ fn show_menu(
     mut marker_query: Query<(&MenuItem, &mut TextSpan, &mut TextColor)>,
     menu : Res<Menu>,
     cur_binds : Res<CurBinds>,
+
+    mut bind_mode_chain : Local<Vec<Binding>>,
+
+    mut input_map_event: EventReader<axis_input::InputMapEvent<Mapping>>,
 ) {
+
+    // let mut bind_mode_chain = Vec::new();
+    for ev in input_map_event.read() {
+        match ev.clone() {
+            axis_input::InputMapEvent::BindPress {  player:0, bindings, .. } => {
+                *bind_mode_chain=bindings;
+            }
+            axis_input::InputMapEvent::BindRelease { player:0,  .. } => {
+                bind_mode_chain.clear();
+            }
+            _=>{}
+        }
+	}
+
     for (item,mut text,mut col) in marker_query.iter_mut() {
 
         if item.0==menu.cur_index {
@@ -379,7 +414,11 @@ fn show_menu(
             0 => {
                 text.0=format!("Rebind X+ : {:?}\n",
                     if menu.in_bind_mode&&menu.cur_index==0 {
-                        "...".to_string()
+                        if bind_mode_chain.is_empty() {
+                            "...".to_string()
+                        } else {
+                            format!("{:?}",bind_mode_chain.clone())
+                        }
                     }else{
                         format!("{:?}",cur_binds.x_pos)
                     }
@@ -388,7 +427,11 @@ fn show_menu(
             1 => {
                 text.0=format!("Rebind X- : {:?}\n",
                     if menu.in_bind_mode&&menu.cur_index==1 {
-                        "...".to_string()
+                        if bind_mode_chain.is_empty() {
+                            "...".to_string()
+                        } else {
+                            format!("{:?}",bind_mode_chain.clone())
+                        }
                     }else{
                         format!("{:?}",cur_binds.x_neg)
                     }
@@ -397,7 +440,11 @@ fn show_menu(
             2 => {
                 text.0=format!("Rebind Y : {:?}\n",
                     if menu.in_bind_mode&&menu.cur_index==2 {
-                        "...".to_string()
+                        if bind_mode_chain.is_empty() {
+                            "...".to_string()
+                        } else {
+                            format!("{:?}",bind_mode_chain.clone())
+                        }
                     }else{
                         format!("{:?}",cur_binds.y)
                     }

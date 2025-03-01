@@ -1095,13 +1095,20 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
             {
                 // println!("a {:?} {:?} : {} {} : {bind_mode_bindings:?}",binding_input.device,binding_input.binding,binding_input.value, has_binding);
 
-                // for &player in device_players.get(&binding_input.device).unwrap().iter() {
-                mapping_event_writer.send(InputMapEvent::BindPress{player:player,device:binding_input.device,binding:binding_input.binding});
-                // }
-
                 bind_mode_bindings.insert(k);
 
-                bind_mode_chain.entry(binding_input.device).or_default().push(binding_input.binding);
+                let chain_bindings=bind_mode_chain.entry(binding_input.device).or_default();
+                chain_bindings.push(binding_input.binding);
+
+                // let chain_bindings=bind_mode_chain.get(&binding_input.device).unwrap();
+
+                // for &player in device_players.get(&binding_input.device).unwrap().iter() {
+                mapping_event_writer.send(InputMapEvent::BindPress{player:player,device:binding_input.device,
+                    bindings:chain_bindings.clone()
+                    // binding:binding_input.binding
+                });
+                // }
+
 
 
             } else if has_binding &&
@@ -1110,7 +1117,10 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
             {
                 // println!("b {:?} {:?} : {} {} : {bind_mode_bindings:?}",binding_input.device,binding_input.binding,binding_input.value, has_binding);
 
-                if let Some(chain_bindings)=bind_mode_chain.remove(&binding_input.device) {
+                // if let Some(chain_bindings)=bind_mode_chain.remove(&binding_input.device)
+
+                let chain_bindings=bind_mode_chain.remove(&binding_input.device).unwrap();
+                {
                     for &binding in chain_bindings.iter() {
                         bind_mode_bindings.remove(&(binding_input.device,binding));
                     }
