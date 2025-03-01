@@ -73,10 +73,10 @@ fn setup_input(
 ) {
     input_map.mapping_repeats=HashMap::from_iter([(Mapping::MenuUp, 0.3),]);
 
-    input_map.device_player = HashMap::from_iter([
-        (axis_input::Device::Other, 0),
-        (axis_input::Device::Gamepad(0), 0),
-    ]);
+    // input_map.device_player = HashMap::from_iter([
+    //     (axis_input::Device::Other, 0),
+    //     (axis_input::Device::Gamepad(0), 0),
+    // ]);
 
     input_map.bind_mode_excludes = HashSet::from_iter([
         Binding::Key(KeyCode::Escape),
@@ -117,6 +117,10 @@ fn update_input(
 
     mut gamepad_events: EventReader<GamepadEvent>,
     mut commands: Commands,
+
+
+    gamepad_owner_query: Query<(Entity,&axis_input::GamepadOwner,)>,
+
 ) {
     for event in gamepad_events.read() {
         match event {
@@ -167,7 +171,13 @@ fn update_input(
                         0..=2 => { //X+ X- Y
                             // input_map.set_bind_mode_devices([axis_input::Device::Other,axis_input::Device::Gamepad(0)]);
 
-                            input_map.bind_mode_devices=HashSet::from_iter([axis_input::Device::Other,axis_input::Device::Gamepad(0)]);
+                            // input_map.bind_mode_devices=HashSet::from_iter([axis_input::Device::Other,axis_input::Device::Gamepad(0)]); //todo!
+
+                            if let Ok((entity,_owner)) = gamepad_owner_query.get_single() {
+                                commands.entity(entity).entry::<axis_input::GamepadBindMode>().and_modify(|mut c|{c.0=true;});
+                            }
+                            // commands.entity(entity)
+
                             menu.in_bind_mode=true;
                             println!("bind mode start");
                         }
@@ -182,7 +192,12 @@ fn update_input(
 
             axis_input::InputMapEvent::BindRelease { player:0, bindings, .. } => {
                 // input_map.set_bind_mode_devices([]);
-                input_map.bind_mode_devices.clear();
+                // input_map.bind_mode_devices.clear(); //todo!
+
+                if let Ok((entity,_owner)) = gamepad_owner_query.get_single() {
+                    commands.entity(entity).entry::<axis_input::GamepadBindMode>().and_modify(|mut c|{c.0=false;});
+                }
+
                 menu.in_bind_mode=false;
 
                 let (mapping,last_bind)=match menu.cur_index {
@@ -215,7 +230,12 @@ fn update_input(
             axis_input::InputMapEvent::JustPressed{mapping:Mapping::MenuCancel, ..} => {
                 if menu.in_bind_mode {
                     // input_map.set_bind_mode_devices([]);
-                    input_map.bind_mode_devices.clear();
+                    // input_map.bind_mode_devices.clear(); //todo!
+
+                    if let Ok((entity,_owner)) = gamepad_owner_query.get_single() {
+                        commands.entity(entity).entry::<axis_input::GamepadBindMode>().and_modify(|mut c|{c.0=false;});
+                    }
+
                     menu.in_bind_mode=false;
                 } else {
                     let (mapping,last_bind)=match menu.cur_index {
