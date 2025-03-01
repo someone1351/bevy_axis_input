@@ -29,9 +29,9 @@ pub struct InputMap<M:Eq> {
     pub mapping_repeats : HashMap<M,f32>, //[mapping]=repeat //
     pub device_dead_zones : HashMap<(Device,Binding),InputDeviceDeadZone>, //
 
-    pub(super) player_mappings : HashMap<i32, HashMap<M,MappingVal>>, //[player][mapping]=mapping_val
-    pub(super) player_primary_mappings : HashMap<i32, HashMap<Binding,HashSet<(M,BindingGroup)>>>, //[player][primary_binding][(mapping,binding_group)]
-    pub(super) player_modifier_mappings : HashMap<i32, HashMap<Binding,HashSet<(M,BindingGroup)>>>, //[player][modifier_binding][(mapping,binding_group)]
+    // pub(super) player_mappings : HashMap<i32, HashMap<M,MappingVal>>, //[player][mapping]=mapping_val
+    // pub(super) player_primary_mappings : HashMap<i32, HashMap<Binding,HashSet<(M,BindingGroup)>>>, //[player][primary_binding][(mapping,binding_group)]
+    // pub(super) player_modifier_mappings : HashMap<i32, HashMap<Binding,HashSet<(M,BindingGroup)>>>, //[player][modifier_binding][(mapping,binding_group)]
 
 
     // pub player_devices : HashMap<PlayerId,HashSet<Device>>, //[player]=devices //
@@ -42,8 +42,8 @@ pub struct InputMap<M:Eq> {
 
     //
     pub bind_mode_devices:HashSet<Device>, //
-    pub(super) bind_mode_bindings:HashSet<(Device,Binding)>,
-    pub(super) bind_mode_chain:HashMap<Device,Vec<Binding>>,
+    // pub(super) bind_mode_bindings:HashSet<(Device,Binding)>,
+    // pub(super) bind_mode_chain:HashMap<Device,Vec<Binding>>,
 
     pub bind_mode_start_dead:f32, //
     pub bind_mode_end_dead:f32, //
@@ -60,9 +60,9 @@ impl<M:Eq> Default for InputMap<M> {
             player_bindings: Default::default(),
             player_bindings_updated: Default::default(),
             mapping_repeats:HashMap::new(),
-            player_mappings : HashMap::new(),
-            player_primary_mappings : HashMap::new(),
-            player_modifier_mappings : HashMap::new(),
+            // player_mappings : HashMap::new(),
+            // player_primary_mappings : HashMap::new(),
+            // player_modifier_mappings : HashMap::new(),
             // player_devices : HashMap::new(),
             device_player:HashMap::new(),
             device_dead_zones : HashMap::new(),
@@ -70,8 +70,8 @@ impl<M:Eq> Default for InputMap<M> {
             // player_bind_mode_devices: HashMap::new(),
             bind_mode_devices: HashSet::new(),
             // player_bind_mode_bindings: HashMap::new(),
-            bind_mode_bindings: HashSet::new(),
-            bind_mode_chain:Default::default(),
+            // bind_mode_bindings: HashSet::new(),
+            // bind_mode_chain:Default::default(),
             bind_mode_start_dead:0.4,
             bind_mode_end_dead:0.2,
             bind_mode_excludes:HashSet::new(),

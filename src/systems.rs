@@ -311,18 +311,27 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
     time: Res<bevy::time::Time>,
 
     mut modifier_binding_vals : Local<HashMap<(Device,Binding),f32>>,
+
+
+    mut player_mappings : Local<HashMap<i32, HashMap<M,MappingVal>>>, //[player][mapping]=mapping_val
+    mut player_primary_mappings : Local<HashMap<i32, HashMap<Binding,HashSet<(M,BindingGroup)>>>>, //[player][primary_binding][(mapping,binding_group)]
+    mut player_modifier_mappings : Local<HashMap<i32, HashMap<Binding,HashSet<(M,BindingGroup)>>>>, //[player][modifier_binding][(mapping,binding_group)]
+
+    mut bind_mode_bindings:Local<HashSet<(Device,Binding)>>,
+    mut bind_mode_chain:Local<HashMap<Device,Vec<Binding>>>,
 ) {
 
     let InputMap {
         player_bindings, player_bindings_updated,
         mapping_repeats,
         // device_dead_zones,
-        player_mappings, player_primary_mappings, player_modifier_mappings,
+        // player_mappings, player_primary_mappings, player_modifier_mappings,
         device_player,
-        bind_mode_excludes, bind_mode_devices, bind_mode_bindings,
+        bind_mode_excludes, bind_mode_devices,
+        // bind_mode_bindings,
         // bind_mode_start_dead, bind_mode_end_dead,
         gamepad_devices, gamepad_device_entity_map,
-        bind_mode_chain,
+        // bind_mode_chain,
         ..
     }=input_map.as_mut();
 
