@@ -26,7 +26,7 @@ pub struct InputMap<M:Eq> {
     pub player_bindings_updated :bool,
 
     pub mapping_repeats : HashMap<M,f32>, //[mapping]=repeat //
-    pub device_dead_zones : HashMap<(Device,Binding),DeadZone>, //
+    // pub device_dead_zones : HashMap<(Device,Binding),DeadZone>, //
 
     // pub(super) player_mappings : HashMap<i32, HashMap<M,MappingVal>>, //[player][mapping]=mapping_val
     // pub(super) player_primary_mappings : HashMap<i32, HashMap<Binding,HashSet<(M,BindingGroup)>>>, //[player][primary_binding][(mapping,binding_group)]
@@ -64,7 +64,7 @@ impl<M:Eq> Default for InputMap<M> {
             // player_modifier_mappings : HashMap::new(),
             // player_devices : HashMap::new(),
             device_player:HashMap::new(),
-            device_dead_zones : HashMap::new(),
+            // device_dead_zones : HashMap::new(),
             // bind_mode_enabled:false,
             // player_bind_mode_devices: HashMap::new(),
             bind_mode_devices: HashSet::new(),

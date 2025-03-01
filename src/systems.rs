@@ -5,6 +5,8 @@ use bevy::{ecs::prelude::*, prelude::GamepadAxis};
 use bevy::input::gamepad::{GamepadAxisChangedEvent, GamepadButtonChangedEvent, GamepadConnection, GamepadConnectionEvent, GamepadEvent,};
 use bevy::input::keyboard::KeyCode;
 
+use crate::GamepadDeadZone;
+
 use super::resources::*;
 use super::events::*;
 use super::values::*;
@@ -52,6 +54,8 @@ pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug>
 
     mut binding_input_event_writer: EventWriter<BindingInputEvent>,
     mut mapping_event_writer: EventWriter<InputMapEvent<M>>,
+
+    gamepad_dead_zones_query: Query<& GamepadDeadZone>,
 ) {
     //
     for event in gamepad_events.read() {
@@ -80,8 +84,6 @@ pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug>
                 input_map.gamepad_device_entity_map.insert(*gamepad, device_index.unwrap());
 
                 //
-
-
                 mapping_event_writer.send(InputMapEvent::GamepadConnect{entity:*gamepad,index:device_index.unwrap(),name:name.clone(),vendor_id:*vendor_id, product_id:*product_id});
 
             }
@@ -98,20 +100,26 @@ pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug>
                 //removal is done in system below
             }
             GamepadEvent::Button(GamepadButtonChangedEvent {value, entity, button:button_type, .. })=> {
-                let device=Device::Gamepad(input_map.gamepad_device_entity_map.get(entity).cloned().unwrap());
+                let entity=*entity;
+                let device=Device::Gamepad(input_map.gamepad_device_entity_map.get(&entity).cloned().unwrap());
                 let binding=Binding::GamepadButton(*button_type);
 
-                let dead_zone=input_map.device_dead_zones.get(&(device,binding));
+                // let dead_zone=input_map.device_dead_zones.get(&(device,binding));
+
+                let dead_zone=gamepad_dead_zones_query.get(entity).ok().and_then(|dead_zones|dead_zones.0.get(&binding));
                 let value=use_dead_zone(*value,dead_zone);
 
                 binding_input_event_writer.send(BindingInputEvent { device, immediate, binding, value, });
             }
             GamepadEvent::Axis(GamepadAxisChangedEvent {value, entity, axis:axis_type })=> {
+                let entity=*entity;
                 let axis_type=*axis_type;
-                let device=Device::Gamepad(input_map.gamepad_device_entity_map.get(entity).cloned().unwrap());
+                let device=Device::Gamepad(input_map.gamepad_device_entity_map.get(&entity).cloned().unwrap());
                 let binding=Binding::GamepadAxis(axis_type);
 
-                let dead_zone=input_map.device_dead_zones.get(&(device,binding));
+                // let dead_zone=input_map.device_dead_zones.get(&(device,binding));
+
+                let dead_zone=gamepad_dead_zones_query.get(entity).ok().and_then(|dead_zones|dead_zones.0.get(&binding));
                 let value=use_dead_zone(*value,dead_zone);
 
                 let last_value=gamepad_axis_lasts.get(&(device,axis_type)).cloned().unwrap_or_default();
