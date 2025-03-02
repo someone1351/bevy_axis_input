@@ -19,15 +19,15 @@ pub struct BindingInputEvent {
 pub enum InputMapEvent<M:Debug> {
     // GamepadConnect{entity:Entity,index:usize,name:String,vendor_id:Option<u16>, product_id:Option<u16>},
     // GamepadDisconnect{entity:Entity,index:usize,name:String,vendor_id:Option<u16>, product_id:Option<u16>},
-    Repeat{mapping:M, dir:i32,delay:f32, player:i32},
-    JustPressed{mapping:M, dir:i32, player:i32},
-    JustReleased{mapping:M, dir:i32, player:i32},
-    ValueChanged{mapping:M, val:f32, player:i32},
-    TempValueChanged{mapping:M, val:f32, player:i32},
+    Repeat{mapping:M, dir:i32,delay:f32, owner:i32},
+    JustPressed{mapping:M, dir:i32, owner:i32},
+    JustReleased{mapping:M, dir:i32, owner:i32},
+    ValueChanged{mapping:M, val:f32, owner:i32},
+    TempValueChanged{mapping:M, val:f32, owner:i32},
 
-    BindPress{player:i32, device : Device, bindings : Vec<Binding>, },
+    BindPressed{owner:i32, device : Device, bindings : Vec<Binding>, },
     //BindReleased{player:i32, device : Device, binding : Binding, },
-    BindRelease{player:i32, device : Device, bindings : Vec<Binding>, },
+    BindReleased{owner:i32, device : Device, bindings : Vec<Binding>, },
 }
 
 // impl<M:Copy+Debug> InputMapEvent<M> {

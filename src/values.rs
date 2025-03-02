@@ -4,15 +4,6 @@ use bevy::prelude::{ Entity, GamepadAxis, GamepadButton, KeyCode, MouseButton};
 
 use serde::Deserialize;
 
-
-
-
-// #[derive(Hash, Eq, PartialEq, Clone, Copy,Debug)]
-// pub(super) struct PlayerId(pub i32);
-
-// #[derive(Hash, Eq, PartialEq, Clone, Copy,Debug)]
-// pub struct GamepadId(pub usize);
-
 #[derive(Hash, Eq, PartialEq, Clone, Copy,Debug)]
 pub enum Device {
     // Touch,
@@ -51,34 +42,6 @@ pub struct DeadZone {
     pub pos_max : f32,
     pub neg_min : f32,
     pub neg_max: f32,
-}
-
-#[derive(Clone,Debug)]
-pub struct SetMappingBind<M:Clone> {
-    pub mapping:M,
-    pub bindings:Vec<Binding>,
-    pub scale:f32,
-    pub primary_dead:f32,
-    pub modifier_dead:f32,
-}
-
-impl<M:Default+Clone> Default for SetMappingBind<M> {
-    fn default() -> Self {
-        Self { mapping: Default::default(), bindings: vec![], scale: 1.0, primary_dead: 0.0, modifier_dead: 0.0 }
-    }
-}
-
-#[derive(Clone,Debug,Default)]
-pub struct SetBindingDead {
-    pub binding:Binding,
-    pub neg:f32,
-    pub pos:f32,
-}
-
-#[derive(Clone,Debug,Default)]
-pub struct SetMappingRepeat<M:Clone> {
-    pub mapping:M,
-    pub delay:f32,
 }
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug,Deserialize,Default)]

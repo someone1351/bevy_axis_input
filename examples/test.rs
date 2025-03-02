@@ -102,7 +102,7 @@ fn setup_input(
         Binding::MouseMoveNegY,
     ]);
 
-    input_map.player_bindings.entry(0).or_insert(HashMap::from_iter([
+    input_map.owner_bindings.entry(0).or_insert(HashMap::from_iter([
         ((Mapping::Quit,vec![Binding::Key(KeyCode::F4)]),(1.0,0.0,0.0)),
         ((Mapping::MenuUp,vec![Binding::Key(KeyCode::ArrowUp)]),(1.0,0.0,0.0)),
         ((Mapping::MenuUp,vec![Binding::Key(KeyCode::ArrowDown)]),(-1.0,0.0,0.0)),
@@ -121,7 +121,7 @@ fn setup_input(
         ((Mapping::Y,cur_binds.y.clone()),(1.0,0.0,0.0)),
     ]));
 
-    input_map.player_bindings_updated=true;
+    input_map.owner_bindings_updated=true;
 
 }
 
@@ -206,9 +206,9 @@ fn update_input(
                             // input_map.bind_mode_devices=HashSet::from_iter([axis_input::Device::Other,axis_input::Device::Gamepad(0)]); //todo!
 
                             if let Ok((entity,_owner)) = gamepad_owner_query.get_single() {
-                                // commands.entity(entity).entry::<axis_input::GamepadBindMode>().and_modify(|mut c|{c.0=true;});
+                                commands.entity(entity).entry().or_insert(axis_input::GamepadBindMode(true));
 
-                                commands.entity(entity).insert(axis_input::GamepadBindMode(true));
+                                // commands.entity(entity).insert(axis_input::GamepadBindMode(true));
                                 // println!("ok!");
                             }
                                 input_map.bind_mode_kbm=true;
@@ -226,9 +226,9 @@ fn update_input(
                 menu.pressed=None;
             }
 
-            axis_input::InputMapEvent::BindPress { player, device, bindings } => {
+            axis_input::InputMapEvent::BindPressed { .. } => {
             }
-            axis_input::InputMapEvent::BindRelease { player:0, bindings, .. } => {
+            axis_input::InputMapEvent::BindReleased { owner:0, bindings, .. } => {
                 // input_map.set_bind_mode_devices([]);
                 // input_map.bind_mode_devices.clear(); //todo!
 
@@ -262,10 +262,10 @@ fn update_input(
                     }
                 };
 
-                let cur_bindings=input_map.player_bindings.get_mut(&0).unwrap();
+                let cur_bindings=input_map.owner_bindings.get_mut(&0).unwrap();
                 let attribs=cur_bindings.remove(&(mapping.clone(),last_bind)).unwrap();
                 cur_bindings.insert((mapping,bindings.clone()), attribs);
-                input_map.player_bindings_updated=true;
+                input_map.owner_bindings_updated=true;
 
             }
             axis_input::InputMapEvent::JustPressed{mapping:Mapping::MenuCancel, ..} => {
@@ -301,8 +301,8 @@ fn update_input(
                         }
                     };
 
-                    input_map.player_bindings.get_mut(&0).unwrap().remove(&(mapping,last_bind)).unwrap();
-                    input_map.player_bindings_updated=true;
+                    input_map.owner_bindings.get_mut(&0).unwrap().remove(&(mapping,last_bind)).unwrap();
+                    input_map.owner_bindings_updated=true;
                 }
             }
 
@@ -381,10 +381,10 @@ fn show_menu(
     // let mut bind_mode_chain = Vec::new();
     for ev in input_map_event.read() {
         match ev.clone() {
-            axis_input::InputMapEvent::BindPress {  player:0, bindings, .. } => {
+            axis_input::InputMapEvent::BindPressed {  owner:0, bindings, .. } => {
                 *bind_mode_chain=bindings;
             }
-            axis_input::InputMapEvent::BindRelease { player:0,  .. } => {
+            axis_input::InputMapEvent::BindReleased { owner:0,  .. } => {
                 bind_mode_chain.clear();
             }
             _=>{}

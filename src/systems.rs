@@ -333,9 +333,9 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
     mut modifier_binding_vals : Local<HashMap<(Device,Binding),f32>>,
 
 
-    mut player_mappings : Local<HashMap<i32, HashMap<M,MappingVal>>>, //[player][mapping]=mapping_val
-    mut player_primary_mappings : Local<HashMap<i32, HashMap<Binding,HashSet<(M,BindingGroup)>>>>, //[player][primary_binding][(mapping,binding_group)]
-    mut player_modifier_mappings : Local<HashMap<i32, HashMap<Binding,HashSet<(M,BindingGroup)>>>>, //[player][modifier_binding][(mapping,binding_group)]
+    mut owner_mappings : Local<HashMap<i32, HashMap<M,MappingVal>>>, //[player][mapping]=mapping_val
+    mut owner_primary_mappings : Local<HashMap<i32, HashMap<Binding,HashSet<(M,BindingGroup)>>>>, //[player][primary_binding][(mapping,binding_group)]
+    mut owner_modifier_mappings : Local<HashMap<i32, HashMap<Binding,HashSet<(M,BindingGroup)>>>>, //[player][modifier_binding][(mapping,binding_group)]
 
     mut bind_mode_bindings:Local<HashSet<(Device,Binding)>>,
     mut bind_mode_chain:Local<HashMap<Device,Vec<Binding>>>,
@@ -347,7 +347,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 ) {
 
     let InputMap {
-        player_bindings, player_bindings_updated,
+        owner_bindings, owner_bindings_updated,
         mapping_repeats,
         // device_dead_zones,
         // player_mappings, player_primary_mappings, player_modifier_mappings,
@@ -364,13 +364,13 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
     }=input_map.as_mut();
 
     //
-    let mut device_player = HashMap::new();
-    device_player.insert(Device::Other, *kbm_owner);
+    let mut device_owner = HashMap::new();
+    device_owner.insert(Device::Other, *kbm_owner);
 
     for (entity,owner,_) in gamepad_query.iter() {
-        let Some(player)=owner.map(|x|x.0) else {continue;};
+        let Some(owner)=owner.map(|x|x.0) else {continue;};
         let device=Device::Gamepad(entity);
-        device_player.insert(device,player);
+        device_owner.insert(device,owner);
     }
 
 
@@ -400,17 +400,17 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
     // println!("{bind_mode_devices:?}");
 
     //
-    let mut player_bind_mode_devices:HashMap<i32,HashSet<Device>> = HashMap::new();
+    let mut owner_bind_mode_devices:HashMap<i32,HashSet<Device>> = HashMap::new();
 
     for &device in bind_mode_devices.iter() {
         // let Some(players)=device_players.get(&device) else {continue;};
 
-        let Some(player)=device_player.get(&device).cloned() else {
+        let Some(owner)=device_owner.get(&device).cloned() else {
             continue;
         };
 
         // for &player in players {
-        player_bind_mode_devices.entry(player).or_default().insert(device);
+        owner_bind_mode_devices.entry(owner).or_default().insert(device);
         // }
     }
 
@@ -451,11 +451,11 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
     //on mappings/bindings updated
     //send events for removed mappings ending? also bindings?
-    if *player_bindings_updated {
-        *player_bindings_updated=false;
+    if *owner_bindings_updated {
+        *owner_bindings_updated=false;
 
-        for (&player,mappings) in player_bindings.iter() {
-            let mut temp_player_mappings: HashMap<M, HashMap<BindingGroup,MappingBindingInfo>>=HashMap::new();
+        for (&owner,mappings) in owner_bindings.iter() {
+            let mut temp_owner_mappings: HashMap<M, HashMap<BindingGroup,MappingBindingInfo>>=HashMap::new();
 
             //collect input in temp mappings
             // for (mapping,bindings,scale,primary_dead,modifier_dead) in mappings.into_iter()
@@ -467,7 +467,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                     continue;
                 }
 
-                let temp_bindings=temp_player_mappings.entry(mapping.clone()).or_default();
+                let temp_bindings=temp_owner_mappings.entry(mapping.clone()).or_default();
                 // let mut modifiers=bindings.to_vec();
                 // let primary=modifiers.pop().unwrap();
 
@@ -479,10 +479,10 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
             //setup primary binding mappings
             {
-                let primary_mappings=player_primary_mappings.entry(player).or_default();
+                let primary_mappings=owner_primary_mappings.entry(owner).or_default();
                 primary_mappings.clear();
 
-                for (mapping,temp_bindings) in temp_player_mappings.iter() {
+                for (mapping,temp_bindings) in temp_owner_mappings.iter() {
                     for (bind_group,_) in temp_bindings.iter() {
                         primary_mappings.entry(bind_group.primary).or_default().insert((mapping.clone(),bind_group.clone()));
                     }
@@ -492,10 +492,10 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
             //setup modifier binding mappings
             {
-                let modifier_mappings=player_modifier_mappings.entry(player).or_default();
+                let modifier_mappings=owner_modifier_mappings.entry(owner).or_default();
                 modifier_mappings.clear();
 
-                for (mapping,temp_bindings) in temp_player_mappings.iter() {
+                for (mapping,temp_bindings) in temp_owner_mappings.iter() {
                     for (bind_group,_) in temp_bindings.iter() {
                         for &modifier in bind_group.modifiers.iter() {
                             modifier_mappings.entry(modifier).or_default().insert((mapping.clone(),bind_group.clone()));
@@ -508,13 +508,13 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
             //setup/insert mappings
             {
-                let mappings=player_mappings.entry(player).or_insert_with(Default::default);
+                let mappings=owner_mappings.entry(owner).or_insert_with(Default::default);
 
                 //remove mappings from player_mappings not in temp
-                mappings.retain(|k,_|temp_player_mappings.contains_key(k));
+                mappings.retain(|k,_|temp_owner_mappings.contains_key(k));
 
                 //add new mappings/binding_infos or replace bindings in player_mapping from temp
-                for (mapping,temp_bindings) in temp_player_mappings {
+                for (mapping,temp_bindings) in temp_owner_mappings {
                     let mapping_val=mappings.entry(mapping).or_default();
 
                     //remove any cur binding valss that are no longer used
@@ -561,7 +561,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
     // };
 
     //
-    let mut player_mapping_binding_vals : HashMap<(i32,M),HashMap<(Device,BindingGroup),f32>> = Default::default();
+    let mut owner_mapping_binding_vals : HashMap<(i32,M),HashMap<(Device,BindingGroup),f32>> = Default::default();
     let mut not_repeatings : HashSet<(i32, M)> = Default::default();
 
 
@@ -585,26 +585,26 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
         //     continue;
         // };
 
-        let Some(player)=device_player.get(&gamepad_device).cloned() else {
+        let Some(owner)=device_owner.get(&gamepad_device).cloned() else {
             continue;
         };
 
-        device_removeds.insert((gamepad_device,player));
+        device_removeds.insert((gamepad_device,owner));
     }
 
-    for (device, player) in device_removeds {
+    for (device, owner) in device_removeds {
         // continue;
         // for &player in players.iter()
         {
-            let Some(mappings)=player_mappings.get(&player) else {
+            let Some(mappings)=owner_mappings.get(&owner) else {
                 continue;
             };
 
             for (mapping,mapping_val) in mappings.iter() {
 
                 //get/init binding_vals
-                let binding_vals=player_mapping_binding_vals
-                    .entry((player,mapping.clone()))
+                let binding_vals=owner_mapping_binding_vals
+                    .entry((owner,mapping.clone()))
                     .or_insert_with(||mapping_val.binding_vals.clone());
 
                 //
@@ -628,16 +628,16 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                 if last_dir!=cur_dir {
                     //send press/release event
                     if cur_dir==0 || last_dir!=0 {
-                        mapping_event_writer.send(InputMapEvent::JustReleased{ mapping: mapping.clone(), dir: last_dir, player: player });
+                        mapping_event_writer.send(InputMapEvent::JustReleased{ mapping: mapping.clone(), dir: last_dir, owner });
                     }
 
                     if last_dir==0 || cur_dir!=0 {
-                        mapping_event_writer.send(InputMapEvent::JustPressed{ mapping: mapping.clone(), dir: cur_dir, player: player });
+                        mapping_event_writer.send(InputMapEvent::JustPressed{ mapping: mapping.clone(), dir: cur_dir, owner });
                     }
 
                     //reset repeating
                     if mapping_repeats.contains_key(&mapping) {
-                        not_repeatings.insert((player,mapping.clone()));
+                        not_repeatings.insert((owner,mapping.clone()));
                     }
                 }
             }
@@ -663,16 +663,16 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
 
     //clear presseds on bind mode
-    for (&player, devices) in player_bind_mode_devices.iter() {
+    for (&owner, devices) in owner_bind_mode_devices.iter() {
 
         //
-        let Some(mapping_vals) = player_mappings.get(&player) else {continue;};
+        let Some(mapping_vals) = owner_mappings.get(&owner) else {continue;};
 
         for (mapping,mapping_val) in mapping_vals.iter() {
 
             //get/init binding_vals
-            let binding_vals=player_mapping_binding_vals
-                .entry((player,mapping.clone()))
+            let binding_vals=owner_mapping_binding_vals
+                .entry((owner,mapping.clone()))
                 .or_insert_with(||mapping_val.binding_vals.clone());
 
             //
@@ -699,16 +699,16 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
             if last_dir!=cur_dir {
                 //send press/release event
                 if cur_dir==0 || last_dir!=0 {
-                    mapping_event_writer.send(InputMapEvent::JustReleased{ mapping: mapping.clone(), dir: last_dir, player: player });
+                    mapping_event_writer.send(InputMapEvent::JustReleased{ mapping: mapping.clone(), dir: last_dir, owner });
                 }
 
                 if last_dir==0 || cur_dir!=0 {
-                    mapping_event_writer.send(InputMapEvent::JustPressed { mapping: mapping.clone(), dir: cur_dir, player: player });
+                    mapping_event_writer.send(InputMapEvent::JustPressed { mapping: mapping.clone(), dir: cur_dir, owner });
                 }
 
                 //reset repeating
                 if mapping_repeats.contains_key(&mapping) {
-                    not_repeatings.insert((player,mapping.clone()));
+                    not_repeatings.insert((owner,mapping.clone()));
                 }
             }
 
@@ -731,7 +731,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
         //     continue;
         // };
 
-        let Some(player)=device_player.get(&binding_input.device).cloned() else {
+        let Some(owner)=device_owner.get(&binding_input.device).cloned() else {
             continue;
         };
 
@@ -739,14 +739,14 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
         // for &player in players
         {
             //
-            let Some(modifier_mappings) = player_modifier_mappings.get(&player)
+            let Some(modifier_mappings) = owner_modifier_mappings.get(&owner)
                 .and_then(|modifier_mappings|modifier_mappings.get(&binding_input.binding))
             else {
                 continue;
             };
 
             //
-            let Some(mapping_vals) = player_mappings.get(&player) else {
+            let Some(mapping_vals) = owner_mappings.get(&owner) else {
                 continue;
             };
 
@@ -757,8 +757,8 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                 let mapping_val = mapping_vals.get(mapping).unwrap();
 
                 //get/init binding_vals
-                let binding_vals=player_mapping_binding_vals
-                    .entry((player,mapping.clone()))
+                let binding_vals=owner_mapping_binding_vals
+                    .entry((owner,mapping.clone()))
                     .or_insert_with(||mapping_val.binding_vals.clone());
                 //
                 let k=(binding_input.device,bind_group.clone());
@@ -776,11 +776,11 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
                     //
                     if cur_val!=binding_val {
-                        mapping_event_writer.send(InputMapEvent::ValueChanged { mapping: mapping.clone(), val: cur_val, player: player });
+                        mapping_event_writer.send(InputMapEvent::ValueChanged { mapping: mapping.clone(), val: cur_val, owner });
                     }
 
                     if cur_val==0.0 {
-                        mapping_event_writer.send(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: cur_dir, player: player });
+                        mapping_event_writer.send(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: cur_dir, owner });
                     }
 
                 //
@@ -798,7 +798,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
         //     continue;
         // };
 
-        let Some(player)=device_player.get(&binding_input.device).cloned() else {
+        let Some(owner)=device_owner.get(&binding_input.device).cloned() else {
             continue;
         };
 
@@ -815,14 +815,14 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
             //
             let Some(primary_mappings) =
-                player_primary_mappings.get(&player)
+                owner_primary_mappings.get(&owner)
                 .and_then(|binding_mappings|binding_mappings.get(&binding_input.binding))
             else {
                 continue;
             };
 
             //
-            let Some(mapping_vals) = player_mappings.get(&player) else {
+            let Some(mapping_vals) = owner_mappings.get(&owner) else {
                 continue;
             };
 
@@ -915,8 +915,8 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                 //
 
                 //get/init binding_vals
-                let binding_vals=player_mapping_binding_vals
-                    .entry((player,mapping.clone()))
+                let binding_vals=owner_mapping_binding_vals
+                    .entry((owner,mapping.clone()))
                     .or_insert_with(||mapping_val.binding_vals.clone());
 
                 //get last binding val
@@ -936,25 +936,25 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                     let cur_dir=if cur_val>0.0{1}else if cur_val<0.0{-1}else{0};
 
                     //
-                    mapping_event_writer.send(InputMapEvent::TempValueChanged { mapping: mapping.clone(), val: cur_val, player: player });
+                    mapping_event_writer.send(InputMapEvent::TempValueChanged { mapping: mapping.clone(), val: cur_val, owner });
 
                     //reset repeating
                     if mapping_repeats.contains_key(&mapping) {
-                        not_repeatings.insert((player,mapping.clone()));
+                        not_repeatings.insert((owner,mapping.clone()));
                     }
 
                     //send press/release events (cur_dir will never be 0)
                     if last_dir==cur_dir || last_dir!=0 { //(last_dir!=cur_dir && last_dir!=0)
-                        mapping_event_writer.send(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: last_dir, player: player }); //0
+                        mapping_event_writer.send(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: last_dir, owner }); //0
                     }
 
                     if last_dir==0 || last_dir!=cur_dir { //(last_dir!=cur_dir && last_dir!=0)
-                        mapping_event_writer.send(InputMapEvent::JustPressed{ mapping:mapping.clone(), dir: cur_dir, player: player }); //1
-                        mapping_event_writer.send(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: cur_dir, player: player }); //2
+                        mapping_event_writer.send(InputMapEvent::JustPressed{ mapping:mapping.clone(), dir: cur_dir, owner }); //1
+                        mapping_event_writer.send(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: cur_dir, owner }); //2
                     }
 
                     if last_dir==cur_dir || last_dir!=0 {
-                        mapping_event_writer.send(InputMapEvent::JustPressed { mapping: mapping.clone(), dir: last_dir, player: player }); //3
+                        mapping_event_writer.send(InputMapEvent::JustPressed { mapping: mapping.clone(), dir: last_dir, owner }); //3
                     }
                 } else {
                     //binding input val
@@ -968,23 +968,23 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
                     //change event
                     if last_val!=cur_val {
-                        mapping_event_writer.send(InputMapEvent::ValueChanged { mapping: mapping.clone(), val: cur_val, player: player });
+                        mapping_event_writer.send(InputMapEvent::ValueChanged { mapping: mapping.clone(), val: cur_val, owner });
                     }
 
                     //
                     if last_dir!=cur_dir {
                         //send press/release event
                         if cur_dir==0 || last_dir!=0 {
-                            mapping_event_writer.send(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: last_dir, player: player });
+                            mapping_event_writer.send(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: last_dir, owner });
                         }
 
                         if last_dir==0 || cur_dir!=0 {
-                            mapping_event_writer.send(InputMapEvent::JustPressed { mapping: mapping.clone(), dir: cur_dir, player: player });
+                            mapping_event_writer.send(InputMapEvent::JustPressed { mapping: mapping.clone(), dir: cur_dir, owner });
                         }
 
                         //reset repeating
                         if mapping_repeats.contains_key(&mapping) {
-                            not_repeatings.insert((player,mapping.clone()));
+                            not_repeatings.insert((owner,mapping.clone()));
                         }
 
                     }
@@ -1001,14 +1001,14 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
 
     //store updated binding vals
-    for ((player,mapping),binding_vals) in player_mapping_binding_vals {
-        let mapping_val=player_mappings.get_mut(&player).unwrap().get_mut(&mapping).unwrap();
+    for ((owner,mapping),binding_vals) in owner_mapping_binding_vals {
+        let mapping_val=owner_mappings.get_mut(&owner).unwrap().get_mut(&mapping).unwrap();
         mapping_val.binding_vals=binding_vals;
     }
 
     //set disabled/reset repeats
-    for (player,mapping) in not_repeatings {
-        let mapping_val=player_mappings.get_mut(&player).unwrap().get_mut(&mapping).unwrap();
+    for (owner,mapping) in not_repeatings {
+        let mapping_val=owner_mappings.get_mut(&owner).unwrap().get_mut(&mapping).unwrap();
         mapping_val.repeating=false;
     }
 
@@ -1018,7 +1018,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
     //do repeatings
     for (mapping,&repeat_time) in mapping_repeats.iter() //input_map.mapping_repeats.iter()
     {
-        for (&player,mapping_vals) in player_mappings.iter_mut() {
+        for (&owner,mapping_vals) in owner_mappings.iter_mut() {
             let Some(mapping_val)=mapping_vals.get_mut(&mapping) else {continue;};
 
             // let cur_val:f32=mapping_val.binding_vals.iter().map(|x|*x.1).sum();
@@ -1039,7 +1039,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                 mapping_val.repeat_time_accum+=time.delta_secs();
 
                 if mapping_val.repeat_time_accum>=duration {
-                    mapping_event_writer.send(InputMapEvent::Repeat { mapping: mapping.clone(), dir: cur_dir, delay: duration, player: player });
+                    mapping_event_writer.send(InputMapEvent::Repeat { mapping: mapping.clone(), dir: cur_dir, delay: duration, owner });
                     mapping_val.repeat_time_accum=0.0;
                     // let dif=mapping_val.repeat_time_accum-duration;
                     // mapping_val.repeat_time_accum=dif-(dif/duration)*duration;
@@ -1087,7 +1087,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
             let k=(binding_input.device,binding_input.binding);
             let has_binding = bind_mode_bindings.contains(&k);
 
-            let Some(player)=device_player.get(&binding_input.device).cloned() else {
+            let Some(owner)=device_owner.get(&binding_input.device).cloned() else {
                 continue;
             };
 
@@ -1105,7 +1105,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                 // let chain_bindings=bind_mode_chain.get(&binding_input.device).unwrap();
 
                 // for &player in device_players.get(&binding_input.device).unwrap().iter() {
-                mapping_event_writer.send(InputMapEvent::BindPress{player:player,device:binding_input.device,
+                mapping_event_writer.send(InputMapEvent::BindPressed{owner,device:binding_input.device,
                     bindings:chain_bindings.clone()
                     // binding:binding_input.binding
                 });
@@ -1126,7 +1126,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                     for &binding in chain_bindings.iter() {
                         bind_mode_bindings.remove(&(binding_input.device,binding));
                     }
-                    mapping_event_writer.send(InputMapEvent::BindRelease{player:player,device:binding_input.device,bindings:chain_bindings});
+                    mapping_event_writer.send(InputMapEvent::BindReleased{owner,device:binding_input.device,bindings:chain_bindings});
                 }
                 // for &player in device_players.get(&binding_input.device).unwrap().iter() {
                 // mapping_event_writer.send(InputMapEvent::BindRelease{player:player,device:binding_input.device,binding:binding_input.binding});

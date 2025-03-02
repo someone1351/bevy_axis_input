@@ -21,8 +21,8 @@ use super::values::*;
 #[derive(Resource)]
 
 pub struct InputMap<M:Eq> {
-    pub player_bindings : HashMap<i32,HashMap<(M,Vec<Binding>),(f32,f32,f32)>>, //[player][mapping,bindings]=(scale,primary_dead,modifier_dead)
-    pub player_bindings_updated :bool,
+    pub owner_bindings : HashMap<i32,HashMap<(M,Vec<Binding>),(f32,f32,f32)>>, //[player][mapping,bindings]=(scale,primary_dead,modifier_dead)
+    pub owner_bindings_updated :bool,
     pub mapping_repeats : HashMap<M,f32>,
     pub bind_mode_excludes : HashSet<Binding>,
     pub bind_mode_start_dead:f32,
@@ -41,18 +41,12 @@ pub struct InputMap<M:Eq> {
 impl<M:Eq> Default for InputMap<M> {
     fn default() -> Self {
         Self {
-            player_bindings: Default::default(),
-            player_bindings_updated: Default::default(),
+            owner_bindings: Default::default(),
+            owner_bindings_updated: Default::default(),
             mapping_repeats:HashMap::new(),
             bind_mode_start_dead:0.4,
             bind_mode_end_dead:0.2,
             bind_mode_excludes:HashSet::new(),
-
-            // // device_player:HashMap::new(),
-            // // bind_mode_devices: HashSet::new(),
-            // gamepad_devices:Vec::new(),
-            // gamepad_device_entity_map:HashMap::new(),
-
             bind_mode_kbm: false,
             kbm_owner: 0,
         }
