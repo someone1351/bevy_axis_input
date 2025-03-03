@@ -25,7 +25,7 @@ fn use_dead_zone(value:f32,dead_zone:Option<&DeadZone>) -> f32 {
 
     let pos_min=dead_zone.pos_min.max(dead_zone.neg_min);
     let neg_min=dead_zone.neg_min.min(dead_zone.pos_min);
-    let pos_max=dead_zone.pos_max.min(pos_min);
+    let pos_max=dead_zone.pos_max.max(pos_min);
     let neg_max=dead_zone.neg_max.min(neg_min);
 
     if value > pos_min {

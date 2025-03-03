@@ -36,12 +36,18 @@ pub(super)struct MappingVal {
     pub repeating:bool,
 }
 
-#[derive(Default,Clone,Debug)]
+#[derive(Clone,Debug)]
 pub struct DeadZone {
     pub pos_min : f32,
     pub pos_max : f32,
     pub neg_min : f32,
     pub neg_max: f32,
+}
+
+impl Default for DeadZone {
+    fn default() -> Self {
+        Self { pos_min: 0.0, pos_max: 1.0, neg_min: 0.0, neg_max: -1.0 }
+    }
 }
 
 #[derive(Clone, Copy, Hash, PartialEq, Eq, Debug,Deserialize,Default)]
