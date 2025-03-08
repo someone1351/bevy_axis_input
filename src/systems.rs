@@ -5,6 +5,9 @@
 
 * if same bindgroup bound to multiple mappings, then when pressed, only one of the mappings will receive the input, is that a problem?
 ** makes sense that the more modifiers a bindgroup has, that it will be used for input, but what about exact same?
+
+* if for example ctrl+s, is bound, and is pressed, but the modifier is released (not the primary), the value will equal -0.0 instead of just 0.0, why?
+
 */
 use std::{collections::{HashMap, HashSet}, fmt::Debug, hash::Hash};
 
@@ -46,77 +49,30 @@ fn use_dead_zone(value:f32,dead_zone:Option<&DeadZone>) -> f32 {
     0.0
 }
 
-pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug>
-(
+pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug> (
     mut gamepad_events: EventReader<GamepadEvent>,
     mut key_events: EventReader<bevy::input::keyboard::KeyboardInput>,
     mut mouse_move_events: EventReader<bevy::input::mouse::MouseMotion>,
     mut mouse_scroll_events: EventReader<bevy::input::mouse::MouseWheel>,
     mut mouse_button_events : EventReader<bevy::input::mouse::MouseButtonInput>,
 
-    // mut input_map : ResMut<InputMap<M>>,
-
     mut gamepad_axis_lasts : Local<HashMap<(Device,GamepadAxis),f32>>,
     mut key_lasts : Local<HashSet<KeyCode>>,
 
     mut binding_input_event_writer: EventWriter<BindingInputEvent>,
-    // mut mapping_event_writer: EventWriter<InputMapEvent<M>>,
 
     gamepad_dead_zones_query: Query<& GamepadDeadZone>,
 ) {
     //
     for event in gamepad_events.read() {
-        let immediate=false;
+        let immediate=false; //what's this for? for differentiating mouse move from the rest?
 
         match event {
-            // GamepadEvent::Connection(GamepadConnectionEvent{gamepad,connection:GamepadConnection::Connected {
-            //     name, vendor_id, product_id
-            // }})=> {
-            //     //println!("{gamepad} {name:?} Connected", );
-
-            //     // let mut device_index=None;
-
-            //     // for (i,x) in input_map.gamepad_devices.iter().enumerate() {
-            //     //     if x.is_none() {
-            //     //         device_index=Some(i);
-            //     //     }
-            //     // }
-
-            //     // if device_index.is_none() {
-            //     //     device_index=Some(input_map.gamepad_devices.len());
-            //     //     input_map.gamepad_devices.push(None);
-            //     // }
-
-            //     // *input_map.gamepad_devices.get_mut(device_index.unwrap()).unwrap()=Some((*gamepad,name.clone(),*vendor_id,*product_id));
-            //     // input_map.gamepad_device_entity_map.insert(*gamepad, device_index.unwrap());
-
-            //     //
-            //     // mapping_event_writer.send(InputMapEvent::GamepadConnect{entity:*gamepad,index:device_index.unwrap(),name:name.clone(),vendor_id:*vendor_id, product_id:*product_id});
-
-            // }
-            // GamepadEvent::Connection(GamepadConnectionEvent{gamepad,connection:GamepadConnection::Disconnected})=> {
-            //     //println!("{:?} Disconnected", gamepad);
-
-            //     // let &index=input_map.gamepad_device_entity_map.get(gamepad).unwrap();
-            //     // let (_,name,vendor_id,product_id) = input_map.gamepad_devices.get(index).cloned().unwrap().unwrap();
-
-            //     // mapping_event_writer.send(InputMapEvent::GamepadDisconnect{entity:*gamepad,index,name,vendor_id, product_id});
-
-            //     // // let i =input_map.gamepad_device_entity_map.remove(gamepad).unwrap();
-            //     // // *input_map.gamepad_devices.get_mut(i).unwrap()=None;
-            //     // //removal is done in system below
-            // }
-            GamepadEvent::Connection(..) => {
-
-            }
+            GamepadEvent::Connection(..) => { }
             GamepadEvent::Button(GamepadButtonChangedEvent {value, entity, button:button_type, .. })=> {
                 let entity=*entity;
-                // let device=Device::Gamepad(input_map.gamepad_device_entity_map.get(&entity).cloned().unwrap());
                 let device=Device::Gamepad(entity);
                 let binding=Binding::GamepadButton(*button_type);
-
-                // let dead_zone=input_map.device_dead_zones.get(&(device,binding));
-
                 let dead_zone=gamepad_dead_zones_query.get(entity).ok().and_then(|dead_zones|dead_zones.0.get(&binding));
                 let value=use_dead_zone(*value,dead_zone);
 
@@ -125,20 +81,13 @@ pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug>
             GamepadEvent::Axis(GamepadAxisChangedEvent {value, entity, axis:axis_type })=> {
                 let entity=*entity;
                 let axis_type=*axis_type;
-                // let device=Device::Gamepad(input_map.gamepad_device_entity_map.get(&entity).cloned().unwrap());
                 let device=Device::Gamepad(entity);
                 let binding=Binding::GamepadAxis(axis_type);
-
-                // let dead_zone=input_map.device_dead_zones.get(&(device,binding));
-
                 let dead_zone=gamepad_dead_zones_query.get(entity).ok().and_then(|dead_zones|dead_zones.0.get(&binding));
                 let value=use_dead_zone(*value,dead_zone);
-
                 let last_value=gamepad_axis_lasts.get(&(device,axis_type)).cloned().unwrap_or_default();
 
-                {
-                    binding_input_event_writer.send(BindingInputEvent { device, immediate, binding, value, });
-                }
+                binding_input_event_writer.send(BindingInputEvent { device, immediate, binding, value, });
 
                 //the "or" part is so to know if last val had been pos and cur val is <=0, so knows to send an event with val=0
                 if value>0.0 || last_value>0.0 && value <= 0.0 {
@@ -325,41 +274,29 @@ pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug>
 pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt::Debug> (
     mut gamepad_events: EventReader<GamepadEvent>,
     mut binding_input_events: EventReader<BindingInputEvent>,
-    mut input_map : ResMut<InputMap<M>>,
-    // mut bind_mode_event_writer: EventWriter<InputMapBindModeEvent>,
     mut mapping_event_writer: EventWriter<InputMapEvent<M>>,
+
+    mut input_map : ResMut<InputMap<M>>,
     time: Res<bevy::time::Time>,
 
-    mut modifier_binding_vals : Local<HashMap<(Device,Binding),f32>>,
-
-
-    mut owner_mappings : Local<HashMap<i32, HashMap<M,MappingVal>>>, //[player][mapping]=mapping_val
-    mut owner_primary_mappings : Local<HashMap<i32, HashMap<Binding,HashSet<(M,BindingGroup)>>>>, //[player][primary_binding][(mapping,binding_group)]
-    mut owner_modifier_mappings : Local<HashMap<i32, HashMap<Binding,HashSet<(M,BindingGroup)>>>>, //[player][modifier_binding][(mapping,binding_group)]
+    gamepad_query: Query<(Entity,Option<& GamepadOwner>,Option<&GamepadBindMode>),With<Gamepad>>,
+    mut device_prev_owners : Local<HashMap<Device,i32>>,
 
     mut bind_mode_bindings:Local<HashSet<(Device,Binding)>>,
     mut bind_mode_chain:Local<HashMap<Device,Vec<Binding>>>,
 
-    gamepad_query: Query<(Entity,Option<& GamepadOwner>,Option<&GamepadBindMode>),With<Gamepad>>,
-    // gamepad_query: Query<(Entity,Option<& GamepadOwner>,Option<&GamepadBindMode>),Or<(With<GamepadOwner>,With<GamepadBindMode>)>>,
-    // gamepad_query2: Query<(Entity,&GamepadBindMode),>,
-    mut device_prev_owners : Local<HashMap<Device,i32>>,
-) {
+    mut modifier_binding_vals : Local<HashMap<(Device,Binding),f32>>,
 
+    mut owner_mappings : Local<HashMap<i32, HashMap<M,MappingVal>>>, //[player][mapping]=mapping_val
+    mut owner_primary_mappings : Local<HashMap<i32, HashMap<Binding,HashSet<(M,BindingGroup)>>>>, //[player][primary_binding][(mapping,binding_group)]
+    mut owner_modifier_mappings : Local<HashMap<i32, HashMap<Binding,HashSet<(M,BindingGroup)>>>>, //[player][modifier_binding][(mapping,binding_group)]
+) {
     let InputMap {
         owner_bindings, owner_bindings_updated,
         mapping_repeats,
-        // device_dead_zones,
-        // player_mappings, player_primary_mappings, player_modifier_mappings,
-        // device_player,
         bind_mode_excludes,
-        // bind_mode_devices,
-        // bind_mode_bindings,
-        // bind_mode_start_dead, bind_mode_end_dead,
-        // gamepad_devices, gamepad_device_entity_map,
-        // bind_mode_chain,
         bind_mode_start_dead,bind_mode_end_dead,
-        kbm_owner,bind_mode_kbm,
+        kbm_owner,kbm_bind_mode: bind_mode_kbm,
         ..
     }=input_map.as_mut();
 
@@ -373,21 +310,13 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
         device_owner.insert(device,owner);
     }
 
-
     //
     let mut bind_mode_devices:HashSet<Device> = HashSet::new();
 
+    //calc bind_mode_devices
     if *bind_mode_kbm {
         bind_mode_devices.insert(Device::Other);
     }
-
-    // for (entity,bind_mode) in gamepad_query2.iter() {
-
-    //     // if bind_mode.0
-    //     {
-    //         bind_mode_devices.insert(Device::Gamepad2(entity));
-    //     }
-    // }
 
     for (entity,_,bind_mode) in gamepad_query.iter() {
         if let Some(bind_mode)=bind_mode {
@@ -397,21 +326,12 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
         }
     }
 
-    // println!("{bind_mode_devices:?}");
-
     //
     let mut owner_bind_mode_devices:HashMap<i32,HashSet<Device>> = HashMap::new();
 
     for &device in bind_mode_devices.iter() {
-        // let Some(players)=device_players.get(&device) else {continue;};
-
-        let Some(owner)=device_owner.get(&device).cloned() else {
-            continue;
-        };
-
-        // for &player in players {
+        let Some(owner)=device_owner.get(&device).cloned() else { continue; };
         owner_bind_mode_devices.entry(owner).or_default().insert(device);
-        // }
     }
 
     //
@@ -447,7 +367,6 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
             }
         }
     }
-    //
 
     //on mappings/bindings updated
     //send events for removed mappings ending? also bindings?
@@ -458,20 +377,12 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
             let mut temp_owner_mappings: HashMap<M, HashMap<BindingGroup,MappingBindingInfo>>=HashMap::new();
 
             //collect input in temp mappings
-            // for (mapping,bindings,scale,primary_dead,modifier_dead) in mappings.into_iter()
             for ((mapping, bindings),&(scale, primary_dead, modifier_dead)) in mappings.iter() {
-
-                // let (mapping,bindings,scale,primary_dead,modifier_dead)=x; //x.borrow().clone();
-
                 if bindings.is_empty() {
                     continue;
                 }
 
                 let temp_bindings=temp_owner_mappings.entry(mapping.clone()).or_default();
-                // let mut modifiers=bindings.to_vec();
-                // let primary=modifiers.pop().unwrap();
-
-                // let modifiers=HashSet::from(modifiers);
                 let binding_group=BindingGroup{ modifiers: bindings[0..bindings.len()-1].to_vec(), primary: bindings.last().unwrap().clone() };
 
                 temp_bindings.insert(binding_group,MappingBindingInfo{scale,primary_dead,modifier_dead}); //,binding_val:0.0
@@ -487,7 +398,6 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                         primary_mappings.entry(bind_group.primary).or_default().insert((mapping.clone(),bind_group.clone()));
                     }
                 }
-                // println!("binding_mappings {binding_mappings:?}");
             }
 
             //setup modifier binding mappings
@@ -502,8 +412,6 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                         }
                     }
                 }
-
-                // println!("modifier_mappings {modifier_mappings:?}");
             }
 
             //setup/insert mappings
@@ -529,11 +437,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                 }
             }
         }
-
     }
-
-
-
 
     //clear player_bind_mode_bindings when bind mode turned off
     {
@@ -547,23 +451,9 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
         // }
     }
 
-    //get players by device
-    // let device_players= {
-    //     let mut device_players= HashMap::<Device,Vec<PlayerId>>::new();
-
-    //     for (&player,devices) in input_map.player_devices.iter() {
-    //         for &device in devices.iter() {
-    //             device_players.entry(device).or_default().push(player);
-    //         }
-    //     }
-
-    //     device_players
-    // };
-
     //
     let mut owner_mapping_binding_vals : HashMap<(i32,M),HashMap<(Device,BindingGroup),f32>> = Default::default();
     let mut not_repeatings : HashSet<(i32, M)> = Default::default();
-
 
     //release inputs of disconnected gamepad (todo)
     for event in gamepad_events.read() {
@@ -571,78 +461,58 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
             continue;
         };
 
-        // let gamepad_device=Device::Gamepad(gamepad_device_entity_map.get(gamepad).cloned().unwrap());
         let gamepad_device=Device::Gamepad(*gamepad);
-
-        //
-        // {
-        //     let i =gamepad_device_entity_map.remove(gamepad).unwrap();
-        //     *gamepad_devices.get_mut(i).unwrap()=None;
-        // }
-
-        //
-        // let Some(players)=device_players.get(&gamepad_device) else {
-        //     continue;
-        // };
-
-        let Some(owner)=device_owner.get(&gamepad_device).cloned() else {
-            continue;
-        };
+        let Some(owner)=device_owner.get(&gamepad_device).cloned() else {continue;};
 
         device_removeds.insert((gamepad_device,owner));
     }
 
+    //
     for (device, owner) in device_removeds {
-        // continue;
-        // for &player in players.iter()
-        {
-            let Some(mappings)=owner_mappings.get(&owner) else {
-                continue;
-            };
+        let Some(mappings)=owner_mappings.get(&owner) else { continue; };
 
-            for (mapping,mapping_val) in mappings.iter() {
+        for (mapping,mapping_val) in mappings.iter() {
+            //get/init binding_vals
+            let binding_vals=owner_mapping_binding_vals
+                .entry((owner,mapping.clone()))
+                .or_insert_with(||mapping_val.binding_vals.clone());
 
-                //get/init binding_vals
-                let binding_vals=owner_mapping_binding_vals
-                    .entry((owner,mapping.clone()))
-                    .or_insert_with(||mapping_val.binding_vals.clone());
+            //
+            let last_val=mapping_val.binding_vals.iter().map(|x|*x.1).sum::<f32>();
+            let last_dir=if last_val>0.0{1}else if last_val<0.0{-1}else{0};
 
-                //
-                let last_val=mapping_val.binding_vals.iter().map(|x|*x.1).sum::<f32>();
-                let last_dir=if last_val>0.0{1}else if last_val<0.0{-1}else{0};
+            //
+            binding_vals.retain(|(device2,_bind_group),_binding_val|{
+                if device==*device2 {
+                    false
+                } else {
+                    true
+                }
+            });
 
-                //
-                binding_vals.retain(|(device2,_bind_group),_binding_val|{
-                    if device==*device2 {
-                        false
-                    } else {
-                        true
-                    }
-                });
+            //
+            let cur_val=binding_vals.iter().map(|x|*x.1).sum::<f32>();
+            let cur_dir=if cur_val>0.0{1}else if cur_val<0.0{-1}else{0};
 
-                //
-                let cur_val=binding_vals.iter().map(|x|*x.1).sum::<f32>();
-                let cur_dir=if cur_val>0.0{1}else if cur_val<0.0{-1}else{0};
+            //
+            if last_dir!=cur_dir {
+                //send press/release event
+                if cur_dir==0 || last_dir!=0 {
+                    mapping_event_writer.send(InputMapEvent::JustReleased{ mapping: mapping.clone(), dir: last_dir, owner });
+                }
 
-                //
-                if last_dir!=cur_dir {
-                    //send press/release event
-                    if cur_dir==0 || last_dir!=0 {
-                        mapping_event_writer.send(InputMapEvent::JustReleased{ mapping: mapping.clone(), dir: last_dir, owner });
-                    }
+                if last_dir==0 || cur_dir!=0 {
+                    mapping_event_writer.send(InputMapEvent::JustPressed{ mapping: mapping.clone(), dir: cur_dir, owner });
+                }
 
-                    if last_dir==0 || cur_dir!=0 {
-                        mapping_event_writer.send(InputMapEvent::JustPressed{ mapping: mapping.clone(), dir: cur_dir, owner });
-                    }
-
-                    //reset repeating
-                    if mapping_repeats.contains_key(&mapping) {
-                        not_repeatings.insert((owner,mapping.clone()));
-                    }
+                //reset repeating
+                if mapping_repeats.contains_key(&mapping) {
+                    not_repeatings.insert((owner,mapping.clone()));
                 }
             }
         }
     }
+
     //
     let binding_inputs=binding_input_events.read().map(|&x|x).collect::<Vec<_>>();
 
@@ -661,15 +531,11 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
         }
     }
 
-
     //clear presseds on bind mode
     for (&owner, devices) in owner_bind_mode_devices.iter() {
-
-        //
         let Some(mapping_vals) = owner_mappings.get(&owner) else {continue;};
 
         for (mapping,mapping_val) in mapping_vals.iter() {
-
             //get/init binding_vals
             let binding_vals=owner_mapping_binding_vals
                 .entry((owner,mapping.clone()))
@@ -681,14 +547,10 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
             //remove bind_groups that have device in bindmode, and aren't excluded from it
             binding_vals.retain(|(device,bind_group),_|{
-                if !devices.contains(device) || (
+                !devices.contains(device) || (
                     bind_mode_excludes.contains(&bind_group.primary) &&
                     bind_group.modifiers.len()==bind_group.modifiers.iter().filter(|&x|bind_mode_excludes.contains(x)).count()
-                ) {
-                    true
-                } else {
-                    false
-                }
+                )
             });
 
             //
@@ -711,12 +573,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                     not_repeatings.insert((owner,mapping.clone()));
                 }
             }
-
         }
-        // //
-        // for device in devices.iter() {
-
-        // }
     }
 
     //on binding release, check all pressed binggroups, that use that modifier and remove/depress them
@@ -726,279 +583,204 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
             continue;
         }
 
-        //
-        // let Some(players)=device_players.get(&binding_input.device) else {
-        //     continue;
-        // };
+        let Some(owner)=device_owner.get(&binding_input.device).cloned() else { continue; };
 
-        let Some(owner)=device_owner.get(&binding_input.device).cloned() else {
+        //
+        let Some(modifier_mappings) = owner_modifier_mappings.get(&owner)
+            .and_then(|modifier_mappings|modifier_mappings.get(&binding_input.binding))
+        else {
             continue;
         };
 
         //
-        // for &player in players
-        {
-            //
-            let Some(modifier_mappings) = owner_modifier_mappings.get(&owner)
-                .and_then(|modifier_mappings|modifier_mappings.get(&binding_input.binding))
-            else {
-                continue;
-            };
+        let Some(mapping_vals) = owner_mappings.get(&owner) else { continue; };
+
+        //find (mapping,device,bind_groups) that released input binding is a modifier of
+        for (mapping,bind_group) in modifier_mappings.iter() {
+            //get mapping val
+            let mapping_val = mapping_vals.get(mapping).unwrap();
+
+            //get/init binding_vals
+            let binding_vals=owner_mapping_binding_vals
+                .entry((owner,mapping.clone()))
+                .or_insert_with(||mapping_val.binding_vals.clone());
 
             //
-            let Some(mapping_vals) = owner_mappings.get(&owner) else {
-                continue;
-            };
+            let device_bind_group=(binding_input.device,bind_group.clone());
+            let binding_val=binding_vals.get(&device_bind_group).cloned().unwrap_or_default();
 
-            //
-            //find (mapping,device,bind_groups) that released input binding is a modifier of
-            for (mapping,bind_group) in modifier_mappings.iter() {
-                //get mapping val
-                let mapping_val = mapping_vals.get(mapping).unwrap();
+            if binding_val!=0.0 {
+                binding_vals.remove(&device_bind_group).unwrap();
 
-                //get/init binding_vals
-                let binding_vals=owner_mapping_binding_vals
-                    .entry((owner,mapping.clone()))
-                    .or_insert_with(||mapping_val.binding_vals.clone());
-                //
-                let k=(binding_input.device,bind_group.clone());
-
-                let binding_val=binding_vals.get(&k).cloned().unwrap_or_default();
-
-                // println!("hmm {k:?} = {binding_val}");
-
-                if binding_val!=0.0 {
-                    binding_vals.remove(&k).unwrap();
-
-                    //get last binding val
-                    let cur_val=binding_vals.iter().map(|x|*x.1).sum::<f32>();
-                    let cur_dir=if cur_val>0.0{1}else if cur_val<0.0{-1}else{0};
-
-                    //
-                    if cur_val!=binding_val {
-                        mapping_event_writer.send(InputMapEvent::ValueChanged { mapping: mapping.clone(), val: cur_val, owner });
-                    }
-
-                    if cur_val==0.0 {
-                        mapping_event_writer.send(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: cur_dir, owner });
-                    }
+                //get last binding val
+                let cur_val=binding_vals.iter().map(|x|*x.1).sum::<f32>();
+                let cur_dir=if cur_val>0.0{1}else if cur_val<0.0{-1}else{0};
 
                 //
+                if cur_val!=binding_val {
+                    mapping_event_writer.send(InputMapEvent::ValueChanged { mapping: mapping.clone(), val: cur_val, owner });
+                }
+
+                if cur_val==0.0 {
+                    mapping_event_writer.send(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: cur_dir, owner });
                 }
             }
-
-
         }
     }
 
     //primaries
     for binding_input in binding_inputs.iter() {
-        //
-        // let Some(players)=device_players.get(&binding_input.device) else {
-        //     continue;
-        // };
+        let Some(owner)=device_owner.get(&binding_input.device).cloned() else { continue; };
+        let is_bind_mode=bind_mode_devices.contains(&binding_input.device);
 
-        let Some(owner)=device_owner.get(&binding_input.device).cloned() else {
+        if is_bind_mode && !bind_mode_excludes.contains(&binding_input.binding) {
+            continue;
+        }
+
+        //
+        let Some(primary_mappings) = owner_primary_mappings.get(&owner)
+            .and_then(|binding_mappings|binding_mappings.get(&binding_input.binding))
+        else {
             continue;
         };
 
         //
-        // for &player in players
-        {
-            // let bind_mode_devices=input_map.player_bind_mode_devices.get(&player);
+        let Some(mapping_vals) = owner_mappings.get(&owner) else { continue; };
 
-            let is_bind_mode=bind_mode_devices.contains(&binding_input.device); //.unwrap_or_default();
+        //
+        let found: Option<(M, BindingGroup,bool)>={
+            //check if any prev pressed
+            let prev_binds=primary_mappings.iter().filter(|(mapping,bind_group)|{
+                let mapping_val = mapping_vals.get(mapping).unwrap();
+                let binding_val=mapping_val.binding_vals.get(&(binding_input.device,bind_group.clone())).cloned().unwrap_or_default();
+                binding_val!=0.0
+            }).map(|x|x.clone()).collect::<Vec<_>>();
 
-            if is_bind_mode && !bind_mode_excludes.contains(&binding_input.binding) {
-                continue;
+            if prev_binds.len()>1 {
+                panic!("input map, prev binds, more than 1, should only be 1");
             }
 
             //
-            let Some(primary_mappings) =
-                owner_primary_mappings.get(&owner)
-                .and_then(|binding_mappings|binding_mappings.get(&binding_input.binding))
-            else {
-                continue;
-            };
+            if let Some((mapping,bind_group))=prev_binds.first() {
+                let mapping_val = mapping_vals.get(mapping).unwrap();
+                let binding_info=mapping_val.binding_infos.get(bind_group).unwrap();
 
-            //
-            let Some(mapping_vals) = owner_mappings.get(&owner) else {
-                continue;
-            };
+                let modifier_pressed_count=bind_group.modifiers.iter().filter(|&&modifier_bind|{
+                    let modifier_val=modifier_binding_vals.get(&(binding_input.device,modifier_bind)).cloned().unwrap_or_default();
+                    let modifier_val = if modifier_val.abs()<binding_info.modifier_dead{0.0}else{modifier_val};
+                    modifier_val==0.0
+                }).count();
 
-            //
-            //
-            let found: Option<(M, BindingGroup,bool)>={
+                let modifiers_pressed=modifier_pressed_count==bind_group.modifiers.len();
 
-                //check if any prev pressed
-                let prev_binds=primary_mappings.iter().filter(|(mapping,bind_group)|{
-                    //get mapping val
+                Some((mapping.clone(),bind_group.clone(),modifiers_pressed))
+            } else {
+                //get valid binding mappings
+                let mut binding_mappings=primary_mappings.iter().map(|x|x.clone()).collect::<Vec<_>>();
+                binding_mappings.sort_by(|a,b|b.1.modifiers.len().cmp(&a.1.modifiers.len()));
+
+                //
+                binding_mappings.retain(|(mapping,bind_group)|{
                     let mapping_val = mapping_vals.get(mapping).unwrap();
-
-                    //
-                    let binding_val=mapping_val.binding_vals.get(&(binding_input.device,bind_group.clone())).cloned().unwrap_or_default();
-
-                    //
-                    binding_val!=0.0
-                }).map(|x|x.clone()).collect::<Vec<_>>();
-
-                if prev_binds.len()>1 {
-                    panic!("input map, prev binds, more than 1, should only be 1");
-                }
-
-                if let Some((mapping,bind_group))=prev_binds.first() {
-                    //get mapping val
-                    let mapping_val = mapping_vals.get(mapping).unwrap();
-
-                    //get binding info
                     let binding_info=mapping_val.binding_infos.get(bind_group).unwrap();
 
-                    let modifier_pressed_count=bind_group.modifiers.iter().filter(|&&modifier_bind|{
+                    //check modifiers pressed
+                    for &modifier_bind in bind_group.modifiers.iter() {
                         let modifier_val=modifier_binding_vals.get(&(binding_input.device,modifier_bind)).cloned().unwrap_or_default();
                         let modifier_val = if modifier_val.abs()<binding_info.modifier_dead{0.0}else{modifier_val};
-                        modifier_val==0.0
-                    }).count();
 
-                    let modifiers_pressed=modifier_pressed_count==bind_group.modifiers.len();
-
-
-                    Some((mapping.clone(),bind_group.clone(),modifiers_pressed))
-                } else {
-
-                    //get valid binding mappings
-                    let mut binding_mappings=primary_mappings.iter().map(|x|x.clone()).collect::<Vec<_>>();
-                    binding_mappings.sort_by(|a,b|b.1.modifiers.len().cmp(&a.1.modifiers.len()));
-
-                    binding_mappings.retain(|(mapping,bind_group)|{
-                        //get mapping val
-                        let mapping_val = mapping_vals.get(mapping).unwrap();
-
-                        //get binding info
-                        let binding_info=mapping_val.binding_infos.get(bind_group).unwrap();
-
-                        //check modifiers pressed
-                        for &modifier_bind in bind_group.modifiers.iter() {
-                            let modifier_val=modifier_binding_vals.get(&(binding_input.device,modifier_bind)).cloned().unwrap_or_default();
-                            let modifier_val = if modifier_val.abs()<binding_info.modifier_dead{0.0}else{modifier_val};
-
-                            if modifier_val== 0.0 {
-                                return false;
-                            }
-
-                            if is_bind_mode && !bind_mode_excludes.contains(&modifier_bind)
-                            {
-                                return false;
-                            }
-
+                        if modifier_val== 0.0 || (is_bind_mode && !bind_mode_excludes.contains(&modifier_bind)) {
+                            return false;
                         }
-
-                        //
-                        true
-                    });
-
-                    binding_mappings.first().map(|(mapping,bind_group)|(mapping.clone(),bind_group.clone(),true))
-                }
-            };
-
-
-            //
-            if let Some((mapping,bind_group,modifiers_pressed))=found {
-
-                //get mapping val
-                let Some(mapping_val) = mapping_vals.get(&mapping) else {
-                    continue;
-                };
-
-                //get binding info
-                let binding_info=mapping_val.binding_infos.get(&bind_group).unwrap();
-
-                //
-
-                //get/init binding_vals
-                let binding_vals=owner_mapping_binding_vals
-                    .entry((owner,mapping.clone()))
-                    .or_insert_with(||mapping_val.binding_vals.clone());
-
-                //get last binding val
-                let last_val=binding_vals.iter().map(|x|*x.1).sum::<f32>();
-                let last_dir=if last_val>0.0{1}else if last_val<0.0{-1}else{0};
-
-                // println!("==m {mapping:?}");
-
-                //
-                if binding_input.immediate {
-                    if !modifiers_pressed {
-                        panic!("input map, immediate, !modifiers_pressed");
                     }
 
                     //
-                    let cur_val=binding_input.value;
-                    let cur_dir=if cur_val>0.0{1}else if cur_val<0.0{-1}else{0};
+                    true
+                });
 
-                    //
-                    mapping_event_writer.send(InputMapEvent::TempValueChanged { mapping: mapping.clone(), val: cur_val, owner });
+                binding_mappings.first().map(|(mapping,bind_group)|(mapping.clone(),bind_group.clone(),true))
+            }
+        };
+
+        //
+        if let Some((mapping,bind_group,modifiers_pressed))=found {
+            let Some(mapping_val) = mapping_vals.get(&mapping) else { continue; };
+            let binding_info=mapping_val.binding_infos.get(&bind_group).unwrap();
+
+            //get/init binding_vals
+            let binding_vals=owner_mapping_binding_vals
+                .entry((owner,mapping.clone()))
+                .or_insert_with(||mapping_val.binding_vals.clone());
+
+            //get last binding val
+            let last_val=binding_vals.iter().map(|x|*x.1).sum::<f32>();
+            let last_dir=if last_val>0.0{1}else if last_val<0.0{-1}else{0};
+
+            //
+            if binding_input.immediate {
+                if !modifiers_pressed {
+                    panic!("input map, immediate, !modifiers_pressed");
+                }
+
+                //
+                let cur_val=binding_input.value;
+                let cur_dir=if cur_val>0.0{1}else if cur_val<0.0{-1}else{0};
+
+                //
+                mapping_event_writer.send(InputMapEvent::TempValueChanged { mapping: mapping.clone(), val: cur_val, owner });
+
+                //reset repeating
+                if mapping_repeats.contains_key(&mapping) {
+                    not_repeatings.insert((owner,mapping.clone()));
+                }
+
+                //send press/release events (cur_dir will never be 0)
+                if last_dir==cur_dir || last_dir!=0 { //(last_dir!=cur_dir && last_dir!=0)
+                    mapping_event_writer.send(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: last_dir, owner }); //0
+                }
+
+                if last_dir==0 || last_dir!=cur_dir { //(last_dir!=cur_dir && last_dir!=0)
+                    mapping_event_writer.send(InputMapEvent::JustPressed{ mapping:mapping.clone(), dir: cur_dir, owner }); //1
+                    mapping_event_writer.send(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: cur_dir, owner }); //2
+                }
+
+                if last_dir==cur_dir || last_dir!=0 {
+                    mapping_event_writer.send(InputMapEvent::JustPressed { mapping: mapping.clone(), dir: last_dir, owner }); //3
+                }
+            } else {
+                //binding input val
+                let input_val = if binding_input.value.abs()<binding_info.primary_dead{0.0}else{binding_input.value}*binding_info.scale;
+                let input_val = if modifiers_pressed {input_val} else {0.0};
+                binding_vals.insert((binding_input.device,bind_group.clone()),input_val);
+
+                //get cur val
+                let cur_val=binding_vals.iter().map(|x|*x.1).sum::<f32>();
+                let cur_dir=if cur_val>0.0{1}else if cur_val<0.0{-1}else{0};
+
+                //change event
+                if last_val!=cur_val {
+                    mapping_event_writer.send(InputMapEvent::ValueChanged { mapping: mapping.clone(), val: cur_val, owner });
+                }
+
+                //
+                if last_dir!=cur_dir {
+                    //send press/release event
+                    if cur_dir==0 || last_dir!=0 {
+                        mapping_event_writer.send(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: last_dir, owner });
+                    }
+
+                    if last_dir==0 || cur_dir!=0 {
+                        mapping_event_writer.send(InputMapEvent::JustPressed { mapping: mapping.clone(), dir: cur_dir, owner });
+                    }
 
                     //reset repeating
                     if mapping_repeats.contains_key(&mapping) {
                         not_repeatings.insert((owner,mapping.clone()));
                     }
-
-                    //send press/release events (cur_dir will never be 0)
-                    if last_dir==cur_dir || last_dir!=0 { //(last_dir!=cur_dir && last_dir!=0)
-                        mapping_event_writer.send(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: last_dir, owner }); //0
-                    }
-
-                    if last_dir==0 || last_dir!=cur_dir { //(last_dir!=cur_dir && last_dir!=0)
-                        mapping_event_writer.send(InputMapEvent::JustPressed{ mapping:mapping.clone(), dir: cur_dir, owner }); //1
-                        mapping_event_writer.send(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: cur_dir, owner }); //2
-                    }
-
-                    if last_dir==cur_dir || last_dir!=0 {
-                        mapping_event_writer.send(InputMapEvent::JustPressed { mapping: mapping.clone(), dir: last_dir, owner }); //3
-                    }
-                } else {
-                    //binding input val
-                    let input_val = if binding_input.value.abs()<binding_info.primary_dead{0.0}else{binding_input.value}*binding_info.scale;
-                    let input_val = if modifiers_pressed {input_val} else {0.0};
-                    binding_vals.insert((binding_input.device,bind_group.clone()),input_val);
-
-                    //get cur val
-                    let cur_val=binding_vals.iter().map(|x|*x.1).sum::<f32>();
-                    let cur_dir=if cur_val>0.0{1}else if cur_val<0.0{-1}else{0};
-
-                    //change event
-                    if last_val!=cur_val {
-                        mapping_event_writer.send(InputMapEvent::ValueChanged { mapping: mapping.clone(), val: cur_val, owner });
-                    }
-
-                    //
-                    if last_dir!=cur_dir {
-                        //send press/release event
-                        if cur_dir==0 || last_dir!=0 {
-                            mapping_event_writer.send(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: last_dir, owner });
-                        }
-
-                        if last_dir==0 || cur_dir!=0 {
-                            mapping_event_writer.send(InputMapEvent::JustPressed { mapping: mapping.clone(), dir: cur_dir, owner });
-                        }
-
-                        //reset repeating
-                        if mapping_repeats.contains_key(&mapping) {
-                            not_repeatings.insert((owner,mapping.clone()));
-                        }
-
-                    }
-
-                    // if last_dir!=cur_dir || cur_dir==0 { //(cur_dir==0 && last_dir==0)
-
-                    // }
-
-                    //
                 }
             }
-        } //for player
+        }
     } //for binding input
-
 
     //store updated binding vals
     for ((owner,mapping),binding_vals) in owner_mapping_binding_vals {
@@ -1012,28 +794,19 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
         mapping_val.repeating=false;
     }
 
-    //
-    // let mapping_repeats=mapping_repeats.clone();
-
     //do repeatings
-    for (mapping,&repeat_time) in mapping_repeats.iter() //input_map.mapping_repeats.iter()
-    {
+    for (mapping,&repeat_time) in mapping_repeats.iter() {
         for (&owner,mapping_vals) in owner_mappings.iter_mut() {
             let Some(mapping_val)=mapping_vals.get_mut(&mapping) else {continue;};
-
-            // let cur_val:f32=mapping_val.binding_vals.iter().map(|x|*x.1).sum();
             let cur_val:f32=mapping_val.binding_vals.iter().map(|x|*x.1).sum();
             let cur_dir=if cur_val>0.0{1}else if cur_val<0.0{-1}else{0};
 
-            if repeat_time<=0.0 {
+            if repeat_time<=0.0
+                || cur_val==0.0 //floating point errs? should clamp? eg clamp(val,-0.0001,0.0001)
+            {
                 continue;
             }
 
-            if cur_val==0.0 { //floating point errs? should clamp? eg clamp(val,-0.0001,0.0001)
-                continue;
-            }
-
-            //
             if mapping_val.repeating {
                 let duration=repeat_time/cur_val.abs();
                 mapping_val.repeat_time_accum+=time.delta_secs();
@@ -1051,115 +824,34 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
         }
     }
 
-    //
-
-    // let mut player_bind_mode_bindings : HashMap<PlayerId,HashSet<(Device,Binding)>> = Default::default();
-
-    // let mut sbind_mode_bindings : HashSet<(Device,Binding)> = input_map.bind_mode_bindings.clone();
-
     //do bind mode
     for binding_input in binding_inputs.iter() {
-        //
-        // let Some(players)=device_players.get(&binding_input.device) else {
-        //     continue;
-        // };
+        let is_bind_mode= bind_mode_devices.contains(&binding_input.device);
 
-        //
-        // for &player in players
-        {
-            // let bind_mode_devices=input_map.player_bind_mode_devices.get(&player);
+        if !is_bind_mode || bind_mode_excludes.contains(&binding_input.binding) {
+            continue;
+        }
 
-            let is_bind_mode=bind_mode_devices.contains(&binding_input.device); //.unwrap_or_default();
+        let device_binding=(binding_input.device,binding_input.binding);
+        let has_binding = bind_mode_bindings.contains(&device_binding);
+        let Some(owner)=device_owner.get(&binding_input.device).cloned() else { continue; };
 
-            if !is_bind_mode || bind_mode_excludes.contains(&binding_input.binding) {
-                continue;
+        if !has_binding && binding_input.value.abs()>*bind_mode_start_dead {
+            let chain_bindings=bind_mode_chain.entry(binding_input.device).or_default();
+            chain_bindings.push(binding_input.binding);
+
+            mapping_event_writer.send(InputMapEvent::BindPressed{owner,device:binding_input.device,bindings:chain_bindings.clone()});
+            bind_mode_bindings.insert(device_binding);
+        } else if has_binding && binding_input.value.abs()<*bind_mode_end_dead {
+            let chain_bindings=bind_mode_chain.remove(&binding_input.device).unwrap();
+
+            for &binding in chain_bindings.iter() {
+                bind_mode_bindings.remove(&(binding_input.device,binding));
             }
 
-            //
-            // let bind_mode_bindings=input_map.player_bind_mode_bindings.get(&player);
-
-            //get/init bind_mode_bindings
-            // let bind_mode_bindings=player_bind_mode_bindings.entry(player).or_insert_with(||{
-            //     input_map.player_bind_mode_bindings.get(&player).map(|x|x.clone()).unwrap_or_default()
-            // });
-
-            //
-            let k=(binding_input.device,binding_input.binding);
-            let has_binding = bind_mode_bindings.contains(&k);
-
-            let Some(owner)=device_owner.get(&binding_input.device).cloned() else {
-                continue;
-            };
-
-            if !has_binding &&
-                // binding_input.value!=0.0
-                binding_input.value.abs()>*bind_mode_start_dead
-            {
-                // println!("a {:?} {:?} : {} {} : {bind_mode_bindings:?}",binding_input.device,binding_input.binding,binding_input.value, has_binding);
-
-                bind_mode_bindings.insert(k);
-
-                let chain_bindings=bind_mode_chain.entry(binding_input.device).or_default();
-                chain_bindings.push(binding_input.binding);
-
-                // let chain_bindings=bind_mode_chain.get(&binding_input.device).unwrap();
-
-                // for &player in device_players.get(&binding_input.device).unwrap().iter() {
-                mapping_event_writer.send(InputMapEvent::BindPressed{owner,device:binding_input.device,
-                    bindings:chain_bindings.clone()
-                    // binding:binding_input.binding
-                });
-                // }
-
-
-
-            } else if has_binding &&
-                // binding_input.value==0.0
-                binding_input.value.abs()<*bind_mode_end_dead
-            {
-                // println!("b {:?} {:?} : {} {} : {bind_mode_bindings:?}",binding_input.device,binding_input.binding,binding_input.value, has_binding);
-
-                // if let Some(chain_bindings)=bind_mode_chain.remove(&binding_input.device)
-
-                let chain_bindings=bind_mode_chain.remove(&binding_input.device).unwrap();
-                {
-                    for &binding in chain_bindings.iter() {
-                        bind_mode_bindings.remove(&(binding_input.device,binding));
-                    }
-                    mapping_event_writer.send(InputMapEvent::BindReleased{owner,device:binding_input.device,bindings:chain_bindings});
-                }
-                // for &player in device_players.get(&binding_input.device).unwrap().iter() {
-                // mapping_event_writer.send(InputMapEvent::BindRelease{player:player,device:binding_input.device,binding:binding_input.binding});
-                // }
-
-                // bind_mode_bindings.remove(&k);
-            } else {
-
-                // println!("c {:?} {:?} : {} {} : {bind_mode_bindings:?}",binding_input.device,binding_input.binding,binding_input.value, has_binding);
-            }
-            //
-            // let bind_mode_dead_start=input_map.bind_mode_dead_start;
-            // let bind_mode_dead_end=input_map.bind_mode_dead_end;
-            // // let binding_events_enabled=input_map.bind_mode_enabled;
-
-
-
-            // if
-            // if binding_input.value ! {
-
-            // }
-
+            mapping_event_writer.send(InputMapEvent::BindReleased{owner,device:binding_input.device,bindings:chain_bindings});
         }
     }
-
-    //store updated bind_mode_bindings
-    // input_map.bind_mode_bindings=bind_mode_bindings;
-
-    // for (player,bind_mode_bindings) in player_bind_mode_bindings {
-    //     let x=input_map.player_bind_mode_bindings.entry(player).or_default();
-    //     x.clear();
-    //     x.extend(bind_mode_bindings);
-    // }
 }
 
 /*

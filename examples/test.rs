@@ -211,7 +211,7 @@ fn update_input(
                                 // commands.entity(entity).insert(axis_input::GamepadBindMode(true));
                                 // println!("ok!");
                             }
-                                input_map.bind_mode_kbm=true;
+                                input_map.kbm_bind_mode=true;
                             // commands.entity(entity)
 
                             menu.in_bind_mode=true;
@@ -237,7 +237,7 @@ fn update_input(
                 {
                     commands.entity(entity).entry::<axis_input::GamepadBindMode>().and_modify(|mut c|{c.0=false;});
                 }
-                input_map.bind_mode_kbm=false;
+                input_map.kbm_bind_mode=false;
 
                 menu.in_bind_mode=false;
 
@@ -276,7 +276,7 @@ fn update_input(
                     if let Ok((entity,_owner)) = gamepad_owner_query.get_single() {
                         commands.entity(entity).entry::<axis_input::GamepadBindMode>().and_modify(|mut c|{c.0=false;});
                     }
-                    input_map.bind_mode_kbm=false;
+                    input_map.kbm_bind_mode=false;
 
                     menu.in_bind_mode=false;
                 } else {

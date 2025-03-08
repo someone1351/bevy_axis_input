@@ -33,8 +33,11 @@ pub struct InputMap<M:Eq> {
     // pub(super) gamepad_devices:Vec<Option<(Entity,String,Option<u16>,Option<u16>)>>,
     // pub(super) gamepad_device_entity_map:HashMap<Entity,usize>,
 
+    // pub owner_kbm_mapping_inverts : HashSet<(i32,M)>,
+    // pub owner_gamepad_mapping_inverts : HashSet<(i32,M)>,
+    // pub owner_device_mapping_inverts : HashSet<(i32,Device,M)>,
 
-    pub bind_mode_kbm:bool,
+    pub kbm_bind_mode:bool,
     pub kbm_owner:i32,
 }
 
@@ -47,7 +50,7 @@ impl<M:Eq> Default for InputMap<M> {
             bind_mode_start_dead:0.4,
             bind_mode_end_dead:0.2,
             bind_mode_excludes:HashSet::new(),
-            bind_mode_kbm: false,
+            kbm_bind_mode: false,
             kbm_owner: 0,
         }
     }
