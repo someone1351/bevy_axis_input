@@ -428,59 +428,6 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
     //
     let mut not_repeatings : HashSet<(i32, M)> = Default::default();
 
-    //handle remove events
-    //  instead of doing values_change, release events, store (owner,mapping) and check there
-    // for ((device, owner), bind_mode_only) in device_removeds {
-    //     let Some(mapping_vals)=owner_mappings.get_mut(&owner) else { continue; };
-
-    //     for mapping in mapping_vals.keys() {
-    //         owner_mapping_changeds.insert((owner,mapping.clone()));
-    //     }
-    // }
-
-
-    // //clear presseds on bind mode
-    // for (&owner, devices) in owner_bind_mode_devices.iter() {
-    //     let Some(mapping_vals) = owner_mappings.get_mut(&owner) else {continue;};
-
-    //     for (mapping,mapping_val) in mapping_vals.iter_mut() {
-    //         //get/init binding_vals
-    //         // let binding_vals=owner_mapping_binding_vals.entry((owner,mapping.clone())).or_insert_with(||mapping_val.binding_vals.clone());
-
-    //         //
-    //         let last_val=mapping_val.binding_vals.iter().map(|x|*x.1).sum::<f32>();
-    //         let last_dir=if last_val>0.0{1}else if last_val<0.0{-1}else{0};
-
-    //         //remove bind_groups that have device in bindmode, and aren't excluded from it
-    //         mapping_val.binding_vals.retain(|(device,bind_group),_|{
-    //             !devices.contains(device) || (
-    //                 bind_mode_excludes.contains(&bind_group.primary) &&
-    //                 bind_group.modifiers.len()==bind_group.modifiers.iter().filter(|&x|bind_mode_excludes.contains(x)).count()
-    //             )
-    //         });
-
-    //         //
-    //         let cur_val=mapping_val.binding_vals.iter().map(|x|*x.1).sum::<f32>();
-    //         let cur_dir=if cur_val>0.0{1}else if cur_val<0.0{-1}else{0};
-
-    //         //
-    //         if last_dir!=cur_dir {
-    //             //send press/release event
-    //             if cur_dir==0 || last_dir!=0 {
-    //                 mapping_event_writer.send(InputMapEvent::JustReleased{ mapping: mapping.clone(), dir: last_dir, owner });
-    //             }
-
-    //             if last_dir==0 || cur_dir!=0 {
-    //                 mapping_event_writer.send(InputMapEvent::JustPressed{ mapping: mapping.clone(), dir: cur_dir, owner });
-    //             }
-
-    //             //reset repeating
-    //             if mapping_repeats.contains_key(&mapping) {
-    //                 not_repeatings.insert((owner,mapping.clone()));
-    //             }
-    //         }
-    //     }
-    // }
 
     //on mappings/bindings updated
     //send events for removed mappings ending? also bindings?
@@ -540,13 +487,6 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
                     owner_mapping_changeds.insert((owner,Some(mapping.clone())));
 
-                    // let mapping_val = mappings.get(&mapping).unwrap();
-
-                    // let last_val=mapping_val.binding_vals.iter().map(|(_,&v)|v).sum::<f32>();
-                    // let last_dir=if last_val>0.0{1}else if last_val<0.0{-1}else{0};
-
-                    // mapping_event_writer.send(InputMapEvent::ValueChanged { mapping: mapping.clone(), val: 0.0, owner });
-                    // mapping_event_writer.send(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: last_dir, owner });
                 }
 
                 mappings.retain(|k,_|temp_owner_mappings.contains_key(k));
@@ -631,24 +571,6 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                 //todo need to do release, valuechange, and press (if necessary)
                 mapping_val.binding_vals.remove(&device_bind_group).unwrap();
 
-                // //get last binding val
-
-                // let cur_val=mapping_val.binding_vals.iter().map(|(_,&v)|v).sum::<f32>();
-                // let cur_dir=if cur_val>0.0{1}else if cur_val<0.0{-1}else{0};
-
-                // // let cur_val=mapping_val.binding_vals.iter().map(|x|*x.1).sum::<f32>();
-                // let last_val=mapping_val.binding_vals.iter().map(|(_,&v)|v).sum::<f32>();
-                // let last_dir=if last_val>0.0{1}else if last_val<0.0{-1}else{0};
-
-                // //
-                // if last_val!=binding_val {
-                //     mapping_event_writer.send(InputMapEvent::ValueChanged { mapping: mapping.clone(), val: last_val, owner });
-                // }
-
-                // if last_val==0.0 {
-                //     //todo dir needs to be what the just_pressed was?
-                //     mapping_event_writer.send(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: last_dir, owner });
-                // }
             }
         }
     }
@@ -850,12 +772,6 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
             }
         }
     } //for binding input
-
-    //store updated binding vals
-    // for ((owner,mapping),binding_vals) in owner_mapping_binding_vals {
-    //     let mapping_val=owner_mappings.get_mut(&owner).unwrap().get_mut(&mapping).unwrap();
-    //     mapping_val.binding_vals=binding_vals;
-    // }
 
     //set disabled/reset repeats
     for (owner,mapping) in not_repeatings {
