@@ -263,7 +263,7 @@ fn update_input(
                 };
 
                 let cur_bindings=input_map.owner_bindings.get_mut(&0).unwrap();
-                let attribs=cur_bindings.remove(&(mapping.clone(),last_bind)).unwrap();
+                let attribs=cur_bindings.remove(&(mapping.clone(),last_bind)).unwrap(); //hmm crash? because binding same mapping twice, which overwrites each other
                 cur_bindings.insert((mapping,bindings.clone()), attribs);
                 input_map.owner_bindings_updated=true;
 

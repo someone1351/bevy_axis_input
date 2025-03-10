@@ -287,7 +287,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
     mut device_bind_mode_lasts : Local<HashSet<Device>>,
 
-    mut modifier_binding_vals : Local<HashMap<(Device,Binding),f32>>,
+    mut modifier_binding_vals : Local<HashMap<(Device,Binding),f32>>, //not just modifier, all binding vals except for immediate ones, zero val are not stored
 
     mut owner_mappings : Local<HashMap<i32, HashMap<M,MappingVal>>>, //[player][mapping]=mapping_val
     mut owner_primary_mappings : Local<HashMap<i32, HashMap<Binding,HashSet<(M,BindingGroup)>>>>, //[player][primary_binding][(mapping,binding_group)]
@@ -515,7 +515,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
     //
     let binding_inputs=binding_input_events.read().map(|&x|x).collect::<Vec<_>>();
 
-    //get modifier input vals
+    //get modifier presses/releases
     for binding_input in binding_inputs.iter() {
         if binding_input.immediate {
             continue;
@@ -523,15 +523,19 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
         let device_binding=(binding_input.device,binding_input.binding);
 
-        if binding_input.value == 0.0 {
+        //should modifier_binding_vals be renamed to binding_vals? but only used for modifiers ..., also immediate values not stored
+        let bind_mode=bind_mode_devices.contains(&binding_input.device) && !bind_mode_excludes.contains(&binding_input.binding);
+
+        if bind_mode || binding_input.value == 0.0 {
             modifier_binding_vals.remove(&device_binding);
         } else {
             modifier_binding_vals.insert(device_binding,binding_input.value);
         }
     }
 
-    //on binding release, check all pressed binggroups, that use that modifier and remove/depress them
+    //on binding release, check all pressed binding_groups, that use that modifier and remove/depress them
     //  need to do all at once
+    //  need to check if binding_input's device is in bind_mode? to ignore? no since already removed above?
     for binding_input in binding_inputs.iter() {
         //
         if binding_input.value!=0.0 || binding_input.immediate {
@@ -621,7 +625,14 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
         }
     }
 
-    //primaries
+    //handle primary presses, primary depresses
+    //  maybe should handle modifier presses/depresses here?
+    //     probably not since modifiers being pressed is handled above
+    //     though kinda makes sense
+    //     although reason not to is because kb and ms are considered the same device
+    //       but their inputs are received separately
+    //       so if say chose to receive kb inputs first and ms second
+    //         then could never use ms inputs as modifiers and kb input as primary
     for binding_input in binding_inputs.iter() {
         let Some(owner)=device_owner.get(&binding_input.device).cloned() else { continue; };
         let is_bind_mode=bind_mode_devices.contains(&binding_input.device);
@@ -631,72 +642,138 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
         }
 
         //
-        let Some(primary_mappings) = owner_primary_mappings.get(&owner).and_then(|binding_mappings|binding_mappings.get(&binding_input.binding)) else {
+        let Some(mapping_vals) = owner_mappings.get_mut(&owner) else { continue; };
+
+        //get (mapping,binding_group)'s, with binding_input.binding as primary
+        let Some(primary_mapping_binding_group_set) = owner_primary_mappings.get(&owner)
+            .and_then(|binding_mappings|binding_mappings.get(&binding_input.binding)) else
+        {
             continue;
         };
 
         //
-        let Some(mapping_vals) = owner_mappings.get_mut(&owner) else { continue; };
+        let mut founds: Vec<(M, BindingGroup,)> = Vec::new();
 
-        //
-        let found: Option<(M, BindingGroup,bool)>={
-            //check if any prev pressed
-            let prev_binds=primary_mappings.iter().filter(|(mapping,bind_group)|{
-                let mapping_val = mapping_vals.get(mapping).unwrap();
-                let binding_val=mapping_val.binding_vals.get(&(binding_input.device,bind_group.clone())).cloned().unwrap_or_default();
-                binding_val!=0.0
-            }).map(|x|x.clone()).collect::<Vec<_>>();
+        for (mapping,bind_group) in primary_mapping_binding_group_set.iter() {
+            let mapping_val = mapping_vals.get(mapping).unwrap();
+            let binding_val=mapping_val.binding_vals.get(&(binding_input.device,bind_group.clone())).cloned().unwrap_or_default();
 
-            if prev_binds.len()>1 { //why?
-                panic!("input map, prev binds, more than 1, should only be 1");
+            if binding_val!=0.0 {
+                // let mapping_val = mapping_vals.get(mapping).unwrap();
+                // let binding_info=mapping_val.binding_infos.get(bind_group).unwrap();
+
+                //not needed since mapping binding_groups that modifiers not pressed are removed above
+                // let modifier_pressed_count=bind_group.modifiers.iter().filter(|&&modifier_bind|{
+                //     let modifier_val=modifier_binding_vals.get(&(binding_input.device,modifier_bind)).cloned().unwrap_or_default();
+                //     let modifier_val = if modifier_val.abs()<binding_info.modifier_dead{0.0}else{modifier_val};
+                //     modifier_val==0.0
+                // }).count();
+
+                // let modifiers_pressed=modifier_pressed_count==bind_group.modifiers.len();
+
+                founds.push((mapping.clone(),bind_group.clone(),));
             }
+        }
 
-            //
-            if let Some((mapping,bind_group))=prev_binds.first() {
+        if founds.is_empty() {
+            //get valid binding mappings
+            let mut primary_mapping_binding_group_vec=primary_mapping_binding_group_set.iter()
+                .map(|x|x.clone()).collect::<Vec<_>>();
+            primary_mapping_binding_group_vec.sort_by(|a,b|b.1.modifiers.len().cmp(&a.1.modifiers.len()));
+
+            //keep ones with all modifiers (if any) pressed
+            primary_mapping_binding_group_vec.retain(|(mapping,bind_group)|{
                 let mapping_val = mapping_vals.get(mapping).unwrap();
                 let binding_info=mapping_val.binding_infos.get(bind_group).unwrap();
 
-                let modifier_pressed_count=bind_group.modifiers.iter().filter(|&&modifier_bind|{
+                //check modifiers pressed
+                for &modifier_bind in bind_group.modifiers.iter() {
                     let modifier_val=modifier_binding_vals.get(&(binding_input.device,modifier_bind)).cloned().unwrap_or_default();
                     let modifier_val = if modifier_val.abs()<binding_info.modifier_dead{0.0}else{modifier_val};
-                    modifier_val==0.0
-                }).count();
 
-                let modifiers_pressed=modifier_pressed_count==bind_group.modifiers.len();
-
-                Some((mapping.clone(),bind_group.clone(),modifiers_pressed))
-            } else {
-                //get valid binding mappings
-                let mut binding_mappings=primary_mappings.iter().map(|x|x.clone()).collect::<Vec<_>>();
-                binding_mappings.sort_by(|a,b|b.1.modifiers.len().cmp(&a.1.modifiers.len()));
+                    if modifier_val== 0.0 || (is_bind_mode && !bind_mode_excludes.contains(&modifier_bind)) {
+                        return false;
+                    }
+                }
 
                 //
-                binding_mappings.retain(|(mapping,bind_group)|{
-                    let mapping_val = mapping_vals.get(mapping).unwrap();
-                    let binding_info=mapping_val.binding_infos.get(bind_group).unwrap();
+                true
+            });
 
-                    //check modifiers pressed
-                    for &modifier_bind in bind_group.modifiers.iter() {
-                        let modifier_val=modifier_binding_vals.get(&(binding_input.device,modifier_bind)).cloned().unwrap_or_default();
-                        let modifier_val = if modifier_val.abs()<binding_info.modifier_dead{0.0}else{modifier_val};
 
-                        if modifier_val== 0.0 || (is_bind_mode && !bind_mode_excludes.contains(&modifier_bind)) {
-                            return false;
-                        }
+            if let Some((_mapping,binding_group))=primary_mapping_binding_group_vec.first() {
+                // let mods_num=binding_group.modifiers.len();
+
+                for (mapping2,binding_group2) in primary_mapping_binding_group_vec.iter() {
+                    if binding_group.modifiers.len() == binding_group2.modifiers.len() {
+                        founds.push((mapping2.clone(),binding_group2.clone(),))
                     }
-
-                    //
-                    true
-                });
-
-                binding_mappings.first().map(|(mapping,bind_group)|(mapping.clone(),bind_group.clone(),true))
+                }
             }
-        };
-
+        }
         //
-        if let Some((mapping,bind_group,modifiers_pressed))=found {
+        // let found: Option<(M, BindingGroup,bool)>={
+        //     //check if any prev pressed
+        //     let prev_binds=primary_mapping_binding_group_set.iter().filter(|(mapping,bind_group)|{
+        //         let mapping_val = mapping_vals.get(mapping).unwrap();
+        //         let binding_val=mapping_val.binding_vals.get(&(binding_input.device,bind_group.clone())).cloned().unwrap_or_default();
+        //         binding_val!=0.0
+        //     }).map(|x|x.clone()).collect::<Vec<_>>();
+
+        //     if prev_binds.len()>1 { //why? as expecting only single primary active out of all the bindgroups it may belong to
+        //         panic!("input map, prev binds, more than 1, should only be 1");
+        //     }
+
+        //     //
+        //     for x in primary_mapping_binding_group_set.iter() {
+
+        //     }
+
+        //     //
+        //     if let Some((mapping,bind_group))=prev_binds.first() {
+        //         let mapping_val = mapping_vals.get(mapping).unwrap();
+        //         let binding_info=mapping_val.binding_infos.get(bind_group).unwrap();
+
+        //         let modifier_pressed_count=bind_group.modifiers.iter().filter(|&&modifier_bind|{
+        //             let modifier_val=modifier_binding_vals.get(&(binding_input.device,modifier_bind)).cloned().unwrap_or_default();
+        //             let modifier_val = if modifier_val.abs()<binding_info.modifier_dead{0.0}else{modifier_val};
+        //             modifier_val==0.0
+        //         }).count();
+
+        //         let modifiers_pressed=modifier_pressed_count==bind_group.modifiers.len();
+
+        //         Some((mapping.clone(),bind_group.clone(),modifiers_pressed))
+        //     } else {
+        //         //get valid binding mappings
+        //         let mut binding_mappings=primary_mapping_binding_group_set.iter().map(|x|x.clone()).collect::<Vec<_>>();
+        //         binding_mappings.sort_by(|a,b|b.1.modifiers.len().cmp(&a.1.modifiers.len()));
+
+        //         //
+        //         binding_mappings.retain(|(mapping,bind_group)|{
+        //             let mapping_val = mapping_vals.get(mapping).unwrap();
+        //             let binding_info=mapping_val.binding_infos.get(bind_group).unwrap();
+
+        //             //check modifiers pressed
+        //             for &modifier_bind in bind_group.modifiers.iter() {
+        //                 let modifier_val=modifier_binding_vals.get(&(binding_input.device,modifier_bind)).cloned().unwrap_or_default();
+        //                 let modifier_val = if modifier_val.abs()<binding_info.modifier_dead{0.0}else{modifier_val};
+
+        //                 if modifier_val== 0.0 || (is_bind_mode && !bind_mode_excludes.contains(&modifier_bind)) {
+        //                     return false;
+        //                 }
+        //             }
+
+        //             //
+        //             true
+        //         });
+
+        //         binding_mappings.first().map(|(mapping,bind_group)|(mapping.clone(),bind_group.clone(),true))
+        //     }
+        // };
+
+        for (mapping,binding_group) in founds {
             let Some(mapping_val) = mapping_vals.get_mut(&mapping) else { continue; };
-            let binding_info=mapping_val.binding_infos.get(&bind_group).unwrap();
+            let binding_info=mapping_val.binding_infos.get(&binding_group).unwrap();
 
             //get/init binding_vals
             // let binding_vals=owner_mapping_binding_vals.entry((owner,mapping.clone())).or_insert_with(||mapping_val.binding_vals.clone());
@@ -707,10 +784,10 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
             let last_dir=if last_val>0.0{1}else if last_val<0.0{-1}else{0};
 
             //
-            if binding_input.immediate {
-                if !modifiers_pressed { //what's this for?
-                    panic!("input map, immediate, !modifiers_pressed");
-                }
+            if binding_input.immediate { //ie mouse move/scroll
+                // if !modifiers_pressed { //what's this for?
+                //     panic!("input map, immediate, !modifiers_pressed");
+                // }
 
                 //
                 let cur_val=binding_input.value;
@@ -740,8 +817,8 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
             } else {
                 //binding input val
                 let input_val = if binding_input.value.abs()<binding_info.primary_dead{0.0}else{binding_input.value}*binding_info.scale;
-                let input_val = if modifiers_pressed {input_val} else {0.0};
-                mapping_val.binding_vals.insert((binding_input.device,bind_group.clone()),input_val);
+                // let input_val = if modifiers_pressed {input_val} else {0.0};
+                mapping_val.binding_vals.insert((binding_input.device,binding_group.clone()),input_val);
 
                 //get cur val
                 // let cur_val=mapping_val.binding_vals.iter().map(|x|*x.1).sum::<f32>();
@@ -771,6 +848,85 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                 }
             }
         }
+
+        //
+        // if let Some((mapping,bind_group,modifiers_pressed))=found {
+        //     let Some(mapping_val) = mapping_vals.get_mut(&mapping) else { continue; };
+        //     let binding_info=mapping_val.binding_infos.get(&bind_group).unwrap();
+
+        //     //get/init binding_vals
+        //     // let binding_vals=owner_mapping_binding_vals.entry((owner,mapping.clone())).or_insert_with(||mapping_val.binding_vals.clone());
+
+        //     //get last binding val
+        //     // let last_val=mapping_val.binding_vals.iter().map(|x|*x.1).sum::<f32>();
+        //     let last_val=mapping_val.binding_vals.iter().map(|(_,&v)|v).sum::<f32>();
+        //     let last_dir=if last_val>0.0{1}else if last_val<0.0{-1}else{0};
+
+        //     //
+        //     if binding_input.immediate { //ie mouse move/scroll
+        //         if !modifiers_pressed { //what's this for?
+        //             panic!("input map, immediate, !modifiers_pressed");
+        //         }
+
+        //         //
+        //         let cur_val=binding_input.value;
+        //         let cur_dir=if cur_val>0.0{1}else if cur_val<0.0{-1}else{0};
+
+        //         //
+        //         mapping_event_writer.send(InputMapEvent::TempValueChanged { mapping: mapping.clone(), val: cur_val, owner });
+
+        //         //reset repeating
+        //         if mapping_repeats.contains_key(&mapping) {
+        //             not_repeatings.insert((owner,mapping.clone()));
+        //         }
+
+        //         //send press/release events (cur_dir will never be 0)
+        //         if last_dir==cur_dir || last_dir!=0 { //(last_dir!=cur_dir && last_dir!=0)
+        //             mapping_event_writer.send(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: last_dir, owner }); //0
+        //         }
+
+        //         if last_dir==0 || last_dir!=cur_dir { //(last_dir!=cur_dir && last_dir!=0)
+        //             mapping_event_writer.send(InputMapEvent::JustPressed{ mapping:mapping.clone(), dir: cur_dir, owner }); //1
+        //             mapping_event_writer.send(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: cur_dir, owner }); //2
+        //         }
+
+        //         if last_dir==cur_dir || last_dir!=0 {
+        //             mapping_event_writer.send(InputMapEvent::JustPressed { mapping: mapping.clone(), dir: last_dir, owner }); //3
+        //         }
+        //     } else {
+        //         //binding input val
+        //         let input_val = if binding_input.value.abs()<binding_info.primary_dead{0.0}else{binding_input.value}*binding_info.scale;
+        //         let input_val = if modifiers_pressed {input_val} else {0.0};
+        //         mapping_val.binding_vals.insert((binding_input.device,bind_group.clone()),input_val);
+
+        //         //get cur val
+        //         // let cur_val=mapping_val.binding_vals.iter().map(|x|*x.1).sum::<f32>();
+        //         let cur_val=mapping_val.binding_vals.iter().map(|(_,&v)|v).sum::<f32>();
+        //         let cur_dir=if cur_val>0.0{1}else if cur_val<0.0{-1}else{0};
+
+        //         //change event
+        //         if last_val!=cur_val {
+        //             mapping_event_writer.send(InputMapEvent::ValueChanged { mapping: mapping.clone(), val: cur_val, owner });
+        //         }
+
+        //         //
+        //         if last_dir!=cur_dir {
+        //             //send press/release event
+        //             if cur_dir==0 || last_dir!=0 {
+        //                 mapping_event_writer.send(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: last_dir, owner });
+        //             }
+
+        //             if last_dir==0 || cur_dir!=0 {
+        //                 mapping_event_writer.send(InputMapEvent::JustPressed { mapping: mapping.clone(), dir: cur_dir, owner });
+        //             }
+
+        //             //reset repeating
+        //             if mapping_repeats.contains_key(&mapping) {
+        //                 not_repeatings.insert((owner,mapping.clone()));
+        //             }
+        //         }
+        //     }
+        // }
     } //for binding input
 
     //set disabled/reset repeats
