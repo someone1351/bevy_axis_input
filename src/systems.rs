@@ -408,6 +408,9 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
         }
     }
 
+    //
+    let mut disconnected_devices = HashSet::<Device>::new();
+
     //release inputs of disconnected gamepad
     for event in gamepad_events.read() {
         let GamepadEvent::Connection(GamepadConnectionEvent{gamepad,connection:GamepadConnection::Disconnected})=event else {continue;};
@@ -417,12 +420,18 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
         //check last owner is same, otherwise pointless?
         // device_removeds.insert((gamepad_device,owner),false);
 
+        disconnected_devices.insert(gamepad_device);
         owner_mapping_changeds.insert((owner,None));owner_mapping_changeds.insert((owner,None));
         // let Some(mapping_vals)=owner_mappings.get(&owner) else { continue; };
 
         // for mapping in mapping_vals.keys() {
         //     owner_mapping_changeds.insert((owner,mapping.clone()));
         // }
+    }
+
+    //clear modifier_binding_vals with disconnected devices
+    if !disconnected_devices.is_empty() {
+        modifier_binding_vals.retain(|(device,_),_|!disconnected_devices.contains(device));
     }
 
     //
