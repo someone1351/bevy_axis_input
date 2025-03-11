@@ -49,6 +49,36 @@ fn use_dead_zone(value:f32,dead_zone:Option<&DeadZone>) -> f32 {
     0.0
 }
 
+fn is_binding_bind_mode(
+    // bind_mode : bool,
+    owner : Option<i32>,
+    owner_excludes : &HashMap<i32,HashSet<Binding>>,
+    owner_includes : &HashMap<i32,HashSet<Binding>>,
+    binding : Binding,
+) -> bool {
+    //
+    // if !bind_mode {
+    //     return false;
+    // }
+
+    //
+    if let Some(bind_mode_excludes)=owner.and_then(|owner|owner_excludes.get(&owner)) {
+        if bind_mode_excludes.contains(&binding) {
+            return false;
+        }
+    }
+
+    //
+    if let Some(bind_mode_includes)=owner.and_then(|owner|owner_includes.get(&owner)) {
+        if !bind_mode_includes.is_empty() && bind_mode_includes.contains(&binding) {
+            return false;
+        }
+    }
+
+    //
+    true
+}
+
 pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug> (
     mut gamepad_events: EventReader<GamepadEvent>,
     mut key_events: EventReader<bevy::input::keyboard::KeyboardInput>,
@@ -296,7 +326,8 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
     let InputMap {
         owner_bindings, owner_bindings_updated,
         mapping_repeats,
-        bind_mode_excludes,
+        bind_mode_owner_includes,
+        bind_mode_owner_excludes,
         bind_mode_start_dead,bind_mode_end_dead,
         kbm_owner,kbm_bind_mode: bind_mode_kbm,
         ..
@@ -353,12 +384,18 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
             //check last owner is same, otherwise pointless?
             // device_removeds.insert((device,owner),true);
 
+            // let bind_mode_excludes=bind_mode_owner_excludes.get(&owner);
+            // let bind_mode_includes=bind_mode_owner_includes.get(&owner);
+
+
+
             owner_mapping_changeds.insert((owner,None));
 
             //
             let Some(mapping_vals)=owner_mappings.get_mut(&owner) else { continue; };
 
 
+            // is_binding_bind_mode(binding,Some(owner),&bind_mode_owner_excludes,&bind_mode_owner_includes)
             //clear presseds on bind mode
 
             for (_mapping,mapping_val) in mapping_vals.iter_mut() {
@@ -366,8 +403,16 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                 mapping_val.binding_vals.retain(|(device2,bind_group),_|{
                     !bind_mode_devices.contains(device2) ||
                     (
-                        bind_mode_excludes.contains(&bind_group.primary) &&
-                        bind_group.modifiers.len()==bind_group.modifiers.iter().filter(|&x|bind_mode_excludes.contains(x)).count()
+                        !is_binding_bind_mode(Some(owner),&bind_mode_owner_excludes,&bind_mode_owner_includes,bind_group.primary) &&
+                        // bind_mode_excludes.contains(&bind_group.primary) &&
+                        // bind_mode_includes.map(|e|!e.is_empty()).unwrap_or(default) &&
+                        // bind_mode_includes.map(|e|e.contains(&bind_group.primary)).unwrap_or_default() &&
+                        // bind_mode_excludes.map(|e|e.contains(&bind_group.primary)).unwrap_or_default() &&
+                        bind_group.modifiers.len()==bind_group.modifiers.iter().filter(|&&x|{
+                            // bind_mode_excludes.contains(x)
+                            // bind_mode_excludes.map(|e|e.contains(x)).unwrap_or_default()
+                            !is_binding_bind_mode(Some(owner),&bind_mode_owner_excludes,&bind_mode_owner_includes,x)
+                        }).count()
                     )
                 });
             }
@@ -532,8 +577,15 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
         let device_binding=(binding_input.device,binding_input.binding);
 
+        let owner = device_owner.get(&binding_input.device).cloned();
+        // let bind_mode_excludes=owner.and_then(|owner|bind_mode_owner_excludes.get(&owner));
+
         //should modifier_binding_vals be renamed to binding_vals? but only used for modifiers ..., also immediate values not stored
-        let bind_mode=bind_mode_devices.contains(&binding_input.device) && !bind_mode_excludes.contains(&binding_input.binding);
+        let bind_mode=bind_mode_devices.contains(&binding_input.device) &&
+            // !bind_mode_excludes.contains(&binding_input.binding)
+            // bind_mode_excludes.map(|e|!e.contains(&binding_input.binding)).unwrap_or(true)
+            is_binding_bind_mode(owner,&bind_mode_owner_excludes,&bind_mode_owner_includes,binding_input.binding)
+            ;
 
         if bind_mode || binding_input.value == 0.0 {
             modifier_binding_vals.remove(&device_binding);
@@ -646,7 +698,13 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
         let Some(owner)=device_owner.get(&binding_input.device).cloned() else { continue; };
         let is_bind_mode=bind_mode_devices.contains(&binding_input.device);
 
-        if is_bind_mode && !bind_mode_excludes.contains(&binding_input.binding) {
+        // let bind_mode_excludes=bind_mode_owner_excludes.get(&owner);
+
+        if is_bind_mode &&
+            // !bind_mode_excludes.contains(&binding_input.binding)
+            // bind_mode_excludes.map(|e|!e.contains(&binding_input.binding)).unwrap_or(true)
+            is_binding_bind_mode(Some(owner),&bind_mode_owner_excludes,&bind_mode_owner_includes,binding_input.binding)
+        {
             continue;
         }
 
@@ -685,6 +743,9 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
         }
 
         if founds.is_empty() {
+
+            // let bind_mode_excludes=bind_mode_owner_excludes.get(&owner);
+
             //get valid binding mappings
             let mut primary_mapping_binding_group_vec=primary_mapping_binding_group_set.iter()
                 .map(|x|x.clone()).collect::<Vec<_>>();
@@ -700,7 +761,11 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                     let modifier_val=modifier_binding_vals.get(&(binding_input.device,modifier_bind)).cloned().unwrap_or_default();
                     let modifier_val = if modifier_val.abs()<binding_info.modifier_dead{0.0}else{modifier_val};
 
-                    if modifier_val== 0.0 || (is_bind_mode && !bind_mode_excludes.contains(&modifier_bind)) {
+                    if modifier_val== 0.0 || (is_bind_mode &&
+                        // !bind_mode_excludes.contains(&modifier_bind)
+                        // bind_mode_excludes.map(|e|!e.contains(&modifier_bind)).unwrap_or(true)
+                        is_binding_bind_mode(Some(owner),&bind_mode_owner_excludes,&bind_mode_owner_includes,binding_input.binding)
+                    ) {
                         return false;
                     }
                 }
@@ -839,15 +904,22 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
     //do bind mode
     for binding_input in binding_inputs.iter() {
+        let Some(owner)=device_owner.get(&binding_input.device).cloned() else { continue; };
         let is_bind_mode= bind_mode_devices.contains(&binding_input.device);
 
-        if !is_bind_mode || bind_mode_excludes.contains(&binding_input.binding) {
+        // let bind_mode_excludes=bind_mode_owner_excludes.get(&owner);
+
+        if !is_bind_mode ||
+            // bind_mode_excludes.contains(&binding_input.binding)
+            // bind_mode_excludes.map(|e|e.contains(&binding_input.binding)).unwrap_or_default()
+
+            !is_binding_bind_mode(Some(owner),&bind_mode_owner_excludes,&bind_mode_owner_includes,binding_input.binding)
+        {
             continue;
         }
 
         let device_binding=(binding_input.device,binding_input.binding);
         let has_binding = bind_mode_bindings.contains(&device_binding);
-        let Some(owner)=device_owner.get(&binding_input.device).cloned() else { continue; };
 
         if !has_binding && binding_input.value.abs()>*bind_mode_start_dead {
             let chain_bindings=bind_mode_chain.entry(binding_input.device).or_default();

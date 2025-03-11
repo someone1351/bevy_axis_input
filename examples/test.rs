@@ -78,7 +78,7 @@ fn setup_input(
     //     (axis_input::Device::Gamepad(0), 0),
     // ]);
 
-    input_map.bind_mode_excludes = HashSet::from_iter([
+    *input_map.bind_mode_owner_excludes.entry(0).or_default() = HashSet::from_iter([
         Binding::Key(KeyCode::Escape),
         Binding::Key(KeyCode::F4),
         Binding::Key(KeyCode::ArrowUp),
