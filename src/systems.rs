@@ -405,12 +405,8 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                     (
                         !is_binding_bind_mode(Some(owner),&bind_mode_owner_excludes,&bind_mode_owner_includes,bind_group.primary) &&
                         // bind_mode_excludes.contains(&bind_group.primary) &&
-                        // bind_mode_includes.map(|e|!e.is_empty()).unwrap_or(default) &&
-                        // bind_mode_includes.map(|e|e.contains(&bind_group.primary)).unwrap_or_default() &&
-                        // bind_mode_excludes.map(|e|e.contains(&bind_group.primary)).unwrap_or_default() &&
                         bind_group.modifiers.len()==bind_group.modifiers.iter().filter(|&&x|{
                             // bind_mode_excludes.contains(x)
-                            // bind_mode_excludes.map(|e|e.contains(x)).unwrap_or_default()
                             !is_binding_bind_mode(Some(owner),&bind_mode_owner_excludes,&bind_mode_owner_includes,x)
                         }).count()
                     )
@@ -583,7 +579,6 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
         //should modifier_binding_vals be renamed to binding_vals? but only used for modifiers ..., also immediate values not stored
         let bind_mode=bind_mode_devices.contains(&binding_input.device) &&
             // !bind_mode_excludes.contains(&binding_input.binding)
-            // bind_mode_excludes.map(|e|!e.contains(&binding_input.binding)).unwrap_or(true)
             is_binding_bind_mode(owner,&bind_mode_owner_excludes,&bind_mode_owner_includes,binding_input.binding)
             ;
 
@@ -702,7 +697,6 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
         if is_bind_mode &&
             // !bind_mode_excludes.contains(&binding_input.binding)
-            // bind_mode_excludes.map(|e|!e.contains(&binding_input.binding)).unwrap_or(true)
             is_binding_bind_mode(Some(owner),&bind_mode_owner_excludes,&bind_mode_owner_includes,binding_input.binding)
         {
             continue;
@@ -763,7 +757,6 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
                     if modifier_val== 0.0 || (is_bind_mode &&
                         // !bind_mode_excludes.contains(&modifier_bind)
-                        // bind_mode_excludes.map(|e|!e.contains(&modifier_bind)).unwrap_or(true)
                         is_binding_bind_mode(Some(owner),&bind_mode_owner_excludes,&bind_mode_owner_includes,binding_input.binding)
                     ) {
                         return false;
@@ -907,12 +900,8 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
         let Some(owner)=device_owner.get(&binding_input.device).cloned() else { continue; };
         let is_bind_mode= bind_mode_devices.contains(&binding_input.device);
 
-        // let bind_mode_excludes=bind_mode_owner_excludes.get(&owner);
-
         if !is_bind_mode ||
             // bind_mode_excludes.contains(&binding_input.binding)
-            // bind_mode_excludes.map(|e|e.contains(&binding_input.binding)).unwrap_or_default()
-
             !is_binding_bind_mode(Some(owner),&bind_mode_owner_excludes,&bind_mode_owner_includes,binding_input.binding)
         {
             continue;
