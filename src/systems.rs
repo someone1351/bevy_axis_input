@@ -51,7 +51,8 @@ fn use_dead_zone(value:f32,dead_zone:Option<&DeadZone>) -> f32 {
 
 fn is_binding_bind_mode(
     // bind_mode : bool,
-    owner : Option<i32>,
+    // owner : Option<i32>,
+    owner : i32,
     owner_excludes : &HashMap<i32,HashSet<Binding>>,
     owner_includes : &HashMap<i32,HashSet<Binding>>,
     binding : Binding,
@@ -62,14 +63,14 @@ fn is_binding_bind_mode(
     // }
 
     //
-    if let Some(bind_mode_excludes)=owner.and_then(|owner|owner_excludes.get(&owner)) {
+    if let Some(bind_mode_excludes)=owner_excludes.get(&owner) {
         if bind_mode_excludes.contains(&binding) {
             return false;
         }
     }
 
     //
-    if let Some(bind_mode_includes)=owner.and_then(|owner|owner_includes.get(&owner)) {
+    if let Some(bind_mode_includes)=owner_includes.get(&owner) {
         if !bind_mode_includes.is_empty() && bind_mode_includes.contains(&binding) {
             return false;
         }
@@ -403,11 +404,11 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                 mapping_val.binding_vals.retain(|(device2,bind_group),_|{
                     !bind_mode_devices.contains(device2) ||
                     (
-                        !is_binding_bind_mode(Some(owner),&bind_mode_owner_excludes,&bind_mode_owner_includes,bind_group.primary) &&
+                        !is_binding_bind_mode(owner,&bind_mode_owner_excludes,&bind_mode_owner_includes,bind_group.primary) &&
                         // bind_mode_excludes.contains(&bind_group.primary) &&
                         bind_group.modifiers.len()==bind_group.modifiers.iter().filter(|&&x|{
                             // bind_mode_excludes.contains(x)
-                            !is_binding_bind_mode(Some(owner),&bind_mode_owner_excludes,&bind_mode_owner_includes,x)
+                            !is_binding_bind_mode(owner,&bind_mode_owner_excludes,&bind_mode_owner_includes,x)
                         }).count()
                     )
                 });
@@ -579,7 +580,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
         //should modifier_binding_vals be renamed to binding_vals? but only used for modifiers ..., also immediate values not stored
         let bind_mode=bind_mode_devices.contains(&binding_input.device) &&
             // !bind_mode_excludes.contains(&binding_input.binding)
-            is_binding_bind_mode(owner,&bind_mode_owner_excludes,&bind_mode_owner_includes,binding_input.binding)
+            owner.map(|owner|is_binding_bind_mode(owner,&bind_mode_owner_excludes,&bind_mode_owner_includes,binding_input.binding)).unwrap_or_default()
             ;
 
         if bind_mode || binding_input.value == 0.0 {
@@ -697,7 +698,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
         if is_bind_mode &&
             // !bind_mode_excludes.contains(&binding_input.binding)
-            is_binding_bind_mode(Some(owner),&bind_mode_owner_excludes,&bind_mode_owner_includes,binding_input.binding)
+            is_binding_bind_mode(owner,&bind_mode_owner_excludes,&bind_mode_owner_includes,binding_input.binding)
         {
             continue;
         }
@@ -757,7 +758,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
                     if modifier_val== 0.0 || (is_bind_mode &&
                         // !bind_mode_excludes.contains(&modifier_bind)
-                        is_binding_bind_mode(Some(owner),&bind_mode_owner_excludes,&bind_mode_owner_includes,binding_input.binding)
+                        is_binding_bind_mode(owner,&bind_mode_owner_excludes,&bind_mode_owner_includes,binding_input.binding)
                     ) {
                         return false;
                     }
@@ -902,7 +903,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
         if !is_bind_mode ||
             // bind_mode_excludes.contains(&binding_input.binding)
-            !is_binding_bind_mode(Some(owner),&bind_mode_owner_excludes,&bind_mode_owner_includes,binding_input.binding)
+            !is_binding_bind_mode(owner,&bind_mode_owner_excludes,&bind_mode_owner_includes,binding_input.binding)
         {
             continue;
         }
