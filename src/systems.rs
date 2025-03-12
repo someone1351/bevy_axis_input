@@ -402,15 +402,17 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
             for (_mapping,mapping_val) in mapping_vals.iter_mut() {
                 //remove bind_groups that have device in bindmode, and aren't excluded from it
                 mapping_val.binding_vals.retain(|(device2,bind_group),_|{
-                    !bind_mode_devices.contains(device2) ||
-                    (
-                        !is_binding_bind_mode(owner,&bind_mode_owner_excludes,&bind_mode_owner_includes,bind_group.primary) &&
-                        // bind_mode_excludes.contains(&bind_group.primary) &&
-                        bind_group.modifiers.len()==bind_group.modifiers.iter().filter(|&&x|{
-                            // bind_mode_excludes.contains(x)
-                            !is_binding_bind_mode(owner,&bind_mode_owner_excludes,&bind_mode_owner_includes,x)
-                        }).count()
-                    )
+                    let not_bind_mode=!bind_mode_devices.contains(device2);
+
+                    // let not_bind_mode=not_bind_mode || bind_mode_excludes.contains(&bind_group.primary);
+                    let not_bind_mode=not_bind_mode || !is_binding_bind_mode(owner,&bind_mode_owner_excludes,&bind_mode_owner_includes,bind_group.primary);
+
+                    // let not_bind_mode=not_bind_mode || bind_group.modifiers.len()==bind_group.modifiers.iter().filter(|&&x|bind_mode_excludes.contains(x)).count();
+                    let not_bind_mode=not_bind_mode || bind_group.modifiers.len()==bind_group.modifiers.iter().filter(|&&binding|{
+                        !is_binding_bind_mode(owner,&bind_mode_owner_excludes,&bind_mode_owner_includes,binding)
+                    }).count();
+
+                    not_bind_mode
                 });
             }
         }
@@ -578,12 +580,11 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
         // let bind_mode_excludes=owner.and_then(|owner|bind_mode_owner_excludes.get(&owner));
 
         //should modifier_binding_vals be renamed to binding_vals? but only used for modifiers ..., also immediate values not stored
-        let bind_mode=bind_mode_devices.contains(&binding_input.device) &&
-            // !bind_mode_excludes.contains(&binding_input.binding)
-            owner.map(|owner|is_binding_bind_mode(owner,&bind_mode_owner_excludes,&bind_mode_owner_includes,binding_input.binding)).unwrap_or_default()
-            ;
+        let is_bind_mode=bind_mode_devices.contains(&binding_input.device);
+        // let bind_mode=bind_mode&&!bind_mode_excludes.contains(&binding_input.binding);
+        let is_bind_mode=is_bind_mode&&owner.map(|owner|is_binding_bind_mode(owner,&bind_mode_owner_excludes,&bind_mode_owner_includes,binding_input.binding)).unwrap_or(false);
 
-        if bind_mode || binding_input.value == 0.0 {
+        if is_bind_mode || binding_input.value == 0.0 {
             modifier_binding_vals.remove(&device_binding);
         } else {
             modifier_binding_vals.insert(device_binding,binding_input.value);
@@ -693,13 +694,11 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
     for binding_input in binding_inputs.iter() {
         let Some(owner)=device_owner.get(&binding_input.device).cloned() else { continue; };
         let is_bind_mode=bind_mode_devices.contains(&binding_input.device);
-
         // let bind_mode_excludes=bind_mode_owner_excludes.get(&owner);
+        // let is_bind_mode=is_bind_mode && !bind_mode_excludes.contains(&binding_input.binding);
+        let is_bind_mode=is_bind_mode && is_binding_bind_mode(owner,&bind_mode_owner_excludes,&bind_mode_owner_includes,binding_input.binding);
 
-        if is_bind_mode &&
-            // !bind_mode_excludes.contains(&binding_input.binding)
-            is_binding_bind_mode(owner,&bind_mode_owner_excludes,&bind_mode_owner_includes,binding_input.binding)
-        {
+        if is_bind_mode {
             continue;
         }
 
@@ -752,13 +751,13 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                 let binding_info=mapping_val.binding_infos.get(bind_group).unwrap();
 
                 //check modifiers pressed
-                for &modifier_bind in bind_group.modifiers.iter() {
-                    let modifier_val=modifier_binding_vals.get(&(binding_input.device,modifier_bind)).cloned().unwrap_or_default();
+                for &modifier_binding in bind_group.modifiers.iter() {
+                    let modifier_val=modifier_binding_vals.get(&(binding_input.device,modifier_binding)).cloned().unwrap_or_default();
                     let modifier_val = if modifier_val.abs()<binding_info.modifier_dead{0.0}else{modifier_val};
 
                     if modifier_val== 0.0 || (is_bind_mode &&
-                        // !bind_mode_excludes.contains(&modifier_bind)
-                        is_binding_bind_mode(owner,&bind_mode_owner_excludes,&bind_mode_owner_includes,binding_input.binding)
+                        // !bind_mode_excludes.contains(&modifier_binding)
+                        is_binding_bind_mode(owner,&bind_mode_owner_excludes,&bind_mode_owner_includes,modifier_binding)
                     ) {
                         return false;
                     }
@@ -900,11 +899,10 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
     for binding_input in binding_inputs.iter() {
         let Some(owner)=device_owner.get(&binding_input.device).cloned() else { continue; };
         let is_bind_mode= bind_mode_devices.contains(&binding_input.device);
+        // let is_bind_mode= is_bind_mode && !bind_mode_excludes.contains(&binding_input.binding);
+        let is_bind_mode= is_bind_mode && is_binding_bind_mode(owner,&bind_mode_owner_excludes,&bind_mode_owner_includes,binding_input.binding);
 
-        if !is_bind_mode ||
-            // bind_mode_excludes.contains(&binding_input.binding)
-            !is_binding_bind_mode(owner,&bind_mode_owner_excludes,&bind_mode_owner_includes,binding_input.binding)
-        {
+        if !is_bind_mode {
             continue;
         }
 
