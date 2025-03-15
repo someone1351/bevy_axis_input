@@ -145,7 +145,7 @@ fn setup_input(
         ((Mapping::Y,cur_binds.y.clone()),(1.0,0.0,0.0)),
     ]));
 
-    input_map.owner_bindings_updated=true;
+    input_map.bindings_updated=true;
 
 }
 
@@ -289,7 +289,7 @@ fn update_input(
                 let cur_bindings=input_map.owner_bindings.get_mut(&0).unwrap();
                 let attribs=cur_bindings.remove(&(mapping.clone(),last_bind)).unwrap(); //hmm crash? because binding same mapping twice, which overwrites each other
                 cur_bindings.insert((mapping,bindings.clone()), attribs);
-                input_map.owner_bindings_updated=true;
+                input_map.bindings_updated=true;
 
             }
             axis_input::InputMapEvent::JustPressed{mapping:Mapping::MenuCancel, ..} => {
@@ -326,7 +326,7 @@ fn update_input(
                     };
 
                     input_map.owner_bindings.get_mut(&0).unwrap().remove(&(mapping,last_bind)).unwrap();
-                    input_map.owner_bindings_updated=true;
+                    input_map.bindings_updated=true;
                 }
             }
 

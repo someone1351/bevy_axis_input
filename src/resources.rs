@@ -22,7 +22,7 @@ use super::values::*;
 
 pub struct InputMap<M:Eq> {
     pub owner_bindings : HashMap<i32,HashMap<(M,Vec<Binding>),(f32,f32,f32)>>, //[owner][mapping,bindings]=(scale,primary_dead,modifier_dead)
-    pub owner_bindings_updated :bool,
+    pub bindings_updated :bool,
     pub mapping_repeats : HashMap<M,f32>,
 
     // // pub bind_mode_excludes : HashSet<Binding>,
@@ -62,7 +62,7 @@ impl<M:Eq> Default for InputMap<M> {
     fn default() -> Self {
         Self {
             owner_bindings: Default::default(),
-            owner_bindings_updated: Default::default(),
+            bindings_updated: Default::default(),
             mapping_repeats:Default::default(),
             bind_mode_start_dead:0.4,
             bind_mode_end_dead:0.2,

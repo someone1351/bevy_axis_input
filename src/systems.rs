@@ -330,7 +330,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
     mut other_device_owners : Local<HashSet<i32>>,
 ) {
     let InputMap {
-        owner_bindings, owner_bindings_updated,
+        owner_bindings, bindings_updated: owner_bindings_updated,
         mapping_repeats,
         // bind_mode_owner_includes,
         // bind_mode_owner_excludes,
