@@ -78,7 +78,31 @@ fn setup_input(
     //     (axis_input::Device::Gamepad(0), 0),
     // ]);
 
-    *input_map.bind_mode_owner_excludes.entry(0).or_default() = HashSet::from_iter([
+    // *input_map.bind_mode_owner_excludes.entry(0).or_default() = HashSet::from_iter([
+    //     Binding::Key(KeyCode::Escape),
+    //     Binding::Key(KeyCode::F4),
+    //     Binding::Key(KeyCode::ArrowUp),
+    //     Binding::Key(KeyCode::ArrowDown),
+    //     Binding::Key(KeyCode::Enter),
+
+    //     //so it uses GamepadAxisPos, GamepadAxisNeg instead
+    //     Binding::GamepadAxis(GamepadAxis::LeftStickX),
+    //     Binding::GamepadAxis(GamepadAxis::LeftStickY),
+    //     Binding::GamepadAxis(GamepadAxis::RightStickX),
+    //     Binding::GamepadAxis(GamepadAxis::RightStickY),
+
+    //     Binding::GamepadButton(GamepadButton::Select),
+    //     Binding::GamepadButton(GamepadButton::Start),
+
+    //     Binding::MouseMoveX,
+    //     Binding::MouseMoveY,
+    //     Binding::MouseMovePosX,
+    //     Binding::MouseMovePosY,
+    //     Binding::MouseMoveNegX,
+    //     Binding::MouseMoveNegY,
+    // ]);
+
+    input_map.bind_mode_excludes = HashSet::from_iter([
         Binding::Key(KeyCode::Escape),
         Binding::Key(KeyCode::F4),
         Binding::Key(KeyCode::ArrowUp),
@@ -228,7 +252,7 @@ fn update_input(
 
             axis_input::InputMapEvent::BindPressed { .. } => {
             }
-            axis_input::InputMapEvent::BindReleased { owner:0, bindings, .. } => {
+            axis_input::InputMapEvent::BindReleased {  bindings, .. } => {
                 // input_map.set_bind_mode_devices([]);
                 // input_map.bind_mode_devices.clear(); //todo!
 
@@ -381,10 +405,10 @@ fn show_menu(
     // let mut bind_mode_chain = Vec::new();
     for ev in input_map_event.read() {
         match ev.clone() {
-            axis_input::InputMapEvent::BindPressed {  owner:0, bindings, .. } => {
+            axis_input::InputMapEvent::BindPressed {  bindings, .. } => {
                 *bind_mode_chain=bindings;
             }
-            axis_input::InputMapEvent::BindReleased { owner:0,  .. } => {
+            axis_input::InputMapEvent::BindReleased {   .. } => {
                 bind_mode_chain.clear();
             }
             _=>{}

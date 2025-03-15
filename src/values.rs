@@ -151,4 +151,31 @@ impl Binding {
 
         }
     }
+
+    pub fn is_gamepad_device(&self) -> bool {
+        if let Self::GamepadAxisPos(_)|Self::GamepadAxisNeg(_)|Self::GamepadAxis(_)|Self::GamepadButton(_)=self {
+            true
+        } else {
+            false
+        }
+    }
+
+    pub fn is_other_device(&self) -> bool {
+        if let Self::MouseMoveX|Self::MouseMoveY
+        |Self::MouseMovePosX|Self::MouseMovePosY
+        |Self::MouseMoveNegX|Self::MouseMoveNegY
+        |Self::MouseScrollPixelX|Self::MouseScrollPixelY
+        |Self::MouseScrollPixelPosX|Self::MouseScrollPixelPosY
+        |Self::MouseScrollPixelNegX|Self::MouseScrollPixelNegY
+        |Self::MouseScrollLineX|Self::MouseScrollLineY
+        |Self::MouseScrollLinePosX|Self::MouseScrollLinePosY
+        |Self::MouseScrollLineNegX|Self::MouseScrollLineNegY
+        |Self::MouseButton(_)
+        |Self::Key(_)
+        = self {
+            true
+        } else {
+            false
+        }
+    }
 }

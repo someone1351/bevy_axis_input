@@ -25,14 +25,27 @@ pub struct InputMap<M:Eq> {
     pub owner_bindings_updated :bool,
     pub mapping_repeats : HashMap<M,f32>,
 
-    // pub bind_mode_excludes : HashSet<Binding>,
-    pub bind_mode_owner_includes : HashMap<i32,HashSet<Binding>>, //[owner][binding]
-    pub bind_mode_owner_excludes : HashMap<i32,HashSet<Binding>>, //[owner][binding]
+    // // pub bind_mode_excludes : HashSet<Binding>,
+    // pub bind_mode_owner_includes : HashMap<i32,HashSet<Binding>>, //[owner][binding]
+    // pub bind_mode_owner_excludes : HashMap<i32,HashSet<Binding>>, //[owner][binding]
+
+    //if owner specified then only works for gamepad devices ...
+    //  why is there an option for having owner based bind mode includes/excludes?
+    // pub bind_mode_owner_includes : HashMap<Option<i32>,HashSet<Binding>>, //[owner/all][binding]
+    // pub bind_mode_owner_excludes : HashMap<Option<i32>,HashSet<Binding>>, //[owner/all][binding]
+
+    pub bind_mode_includes : HashSet<Binding>, //[binding]
+    pub bind_mode_excludes : HashSet<Binding>, //[binding]
+
     pub bind_mode_start_dead:f32,
     pub bind_mode_end_dead:f32,
 
     pub kbm_bind_mode:bool,
-    pub kbm_owner:i32,
+
+    //no owners for kbm, just anyone who has a binding to it can use it
+    //  what about on bind mode?
+    //     should bind mode events have an option<owner> or should the event be sent to all owners? can't know all the others though
+    // pub kbm_owner:i32,
 
     // // pub device_player : HashMap::<Device,i32>,
     // // pub bind_mode_devices:HashSet<Device>, //
@@ -54,10 +67,13 @@ impl<M:Eq> Default for InputMap<M> {
             bind_mode_start_dead:0.4,
             bind_mode_end_dead:0.2,
             // bind_mode_excludes:HashSet::new(),
-            bind_mode_owner_includes:Default::default(),
-            bind_mode_owner_excludes:Default::default(),
+            // bind_mode_owner_includes:Default::default(),
+            // bind_mode_owner_excludes:Default::default(),
+
+            bind_mode_includes:Default::default(),
+            bind_mode_excludes:Default::default(),
             kbm_bind_mode: false,
-            kbm_owner: 0,
+            // kbm_owner: 0,
         }
     }
 }

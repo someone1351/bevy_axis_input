@@ -25,9 +25,11 @@ pub enum InputMapEvent<M:Debug> {
     ValueChanged{mapping:M, val:f32, owner:i32},
     TempValueChanged{mapping:M, val:f32, owner:i32},
 
-    BindPressed{owner:i32, device : Device, bindings : Vec<Binding>, },
+    // BindPressed{owner:Option<i32>, device : Device, bindings : Vec<Binding>, },
+    BindPressed{device : Device, bindings : Vec<Binding>, },
     //BindReleased{player:i32, device : Device, binding : Binding, },
-    BindReleased{owner:i32, device : Device, bindings : Vec<Binding>, },
+    // BindReleased{owner:Option<i32>, device : Device, bindings : Vec<Binding>, },
+    BindReleased{device : Device, bindings : Vec<Binding>, },
 }
 
 // impl<M:Copy+Debug> InputMapEvent<M> {
