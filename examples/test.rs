@@ -71,7 +71,7 @@ fn setup_input(
     mut input_map: ResMut<axis_input::InputMap<Mapping>>,
     cur_binds : Res<CurBinds>,
 ) {
-    input_map.mapping_repeats=HashMap::from_iter([(Mapping::MenuUp, 0.3),]);
+    input_map.mapping_repeats=HashMap::from_iter([(Mapping::MenuUp, (0.3,0.3)),]);
 
     // input_map.device_player = HashMap::from_iter([
     //     (axis_input::Device::Other, 0),

@@ -1,6 +1,6 @@
 use std::collections::HashMap;
 
-use bevy::prelude::{ Entity, GamepadAxis, GamepadButton, KeyCode, MouseButton};
+use bevy::{prelude::{ Entity, GamepadAxis, GamepadButton, KeyCode, MouseButton}, reflect::Reflect};
 
 use serde::Deserialize;
 
@@ -50,7 +50,7 @@ impl Default for DeadZone {
     }
 }
 
-#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug,Deserialize,Default)]
+#[derive(Clone, Copy, Hash, PartialEq, Eq, Debug,Deserialize,Default,Reflect)]
 pub enum Binding {
     #[default]
     None,

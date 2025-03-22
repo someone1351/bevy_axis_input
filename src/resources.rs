@@ -23,7 +23,7 @@ use super::values::*;
 pub struct InputMap<M:Eq> {
     pub owner_bindings : HashMap<i32,HashMap<(M,Vec<Binding>),(f32,f32,f32)>>, //[owner][mapping,bindings]=(scale,primary_dead,modifier_dead)
     pub bindings_updated :bool,
-    pub mapping_repeats : HashMap<M,f32>,
+    pub mapping_repeats : HashMap<M,(f32,f32)>, //[mapping]=(initial_delay, rate)
 
     // // pub bind_mode_excludes : HashSet<Binding>,
     // pub bind_mode_owner_includes : HashMap<i32,HashSet<Binding>>, //[owner][binding]

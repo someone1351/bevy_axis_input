@@ -922,7 +922,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
     }
 
     //do repeatings
-    for (mapping,&repeat_time) in mapping_repeats.iter() {
+    for (mapping,&(repeat_initial_delay, repeat_time)) in mapping_repeats.iter() {
         for (&owner,mapping_vals) in owner_mappings.iter_mut() {
             let Some(mapping_val)=mapping_vals.get_mut(&mapping) else {continue;};
             // let cur_val:f32=mapping_val.binding_vals.iter().map(|x|*x.1).sum();
@@ -934,18 +934,28 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
             }
 
             if mapping_val.repeating {
-                let duration=repeat_time/cur_val.abs();
+                let duration=repeat_time/cur_val.abs(); //why divide by cur_val? so repeats slower if value less than 1 (or faster if greater than 1, though generally 1 is max)
                 mapping_val.repeat_time_accum+=time.delta_secs();
 
                 if mapping_val.repeat_time_accum>=duration {
-                    mapping_event_writer.send(InputMapEvent::Repeat { mapping: mapping.clone(), dir: cur_dir, delay: duration, owner });
+                    mapping_event_writer.send(InputMapEvent::Repeat {
+                        mapping: mapping.clone(),
+                        dir: cur_dir,
+                        delay: duration,
+                        owner,
+                    });
+
                     mapping_val.repeat_time_accum=0.0;
                     // let dif=mapping_val.repeat_time_accum-duration;
                     // mapping_val.repeat_time_accum=dif-(dif/duration)*duration;
                 }
             } else {
-                mapping_val.repeating=true;
-                mapping_val.repeat_time_accum=0.0;
+                if mapping_val.repeat_time_accum < repeat_initial_delay {
+                    mapping_val.repeat_time_accum+=time.delta_secs();
+                } else {
+                    mapping_val.repeating=true;
+                    mapping_val.repeat_time_accum=0.0;
+                }
             }
         }
     }
