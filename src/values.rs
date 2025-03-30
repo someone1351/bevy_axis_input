@@ -107,6 +107,12 @@ impl ToString for Binding {
     }
 }
 
+impl ToString for &Binding {
+    fn to_string(&self) -> String {
+        format!("{:?}",self)
+    }
+}
+
 impl Binding {
     pub fn get_inner_string(&self) -> String {
         match self {
