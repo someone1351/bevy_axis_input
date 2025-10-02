@@ -11,7 +11,7 @@ ron = "0.8.1"
 
 [dev-dependencies]
 #bevy = { version = "0.17", default-features = false, features = ["bevy_window","x11","bevy_asset","bevy_render","bevy_text","bevy_ui","bevy_gilrs"] }
-bevy = { version = "0.17", default-features = true, features = [ "serialize", ] }
+bevy = { version = "0.17", default-features = true, features = [ "serialize", "file_watcher"] }
 
 [lib]
 name = "bevy_axis_input"
