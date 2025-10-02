@@ -1,10 +1,10 @@
-use bevy::prelude::Event;
+use bevy::prelude::Message;
 use std::fmt::Debug;
 use super::values::*;
 
 
 
-#[derive(Debug,Clone,PartialEq,Event,Copy)]
+#[derive(Debug,Clone,PartialEq,Message,Copy)]
 
 pub struct BindingInputEvent {
     pub binding : Binding,
@@ -14,7 +14,7 @@ pub struct BindingInputEvent {
 }
 
 
-#[derive(Debug,Clone,PartialEq,Event)]//Copy,
+#[derive(Debug,Clone,PartialEq,Message)]//Copy,
 
 pub enum InputMapEvent<M:Debug> {
     // GamepadConnect{entity:Entity,index:usize,name:String,vendor_id:Option<u16>, product_id:Option<u16>},

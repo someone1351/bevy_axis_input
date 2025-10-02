@@ -28,13 +28,13 @@ where
     fn build(&self, app: &mut bevy::app::App) {
         app
             .init_resource::<InputMap<M>>()
-            .add_event::<InputMapEvent<M>>()
-            .add_event::<BindingInputEvent>()
+            .add_message::<InputMapEvent<M>>()
+            .add_message::<BindingInputEvent>()
 
             .add_systems(bevy::app::PreUpdate, (
                 binding_inputs_system::<M>,
                 mapping_event_system::<M>,
-            ).chain().in_set(InputMapSystem).after(bevy::input::InputSystem)
+            ).chain().in_set(InputMapSystem)//.after(InputSystem)
             // .before(mapping_event_system::<M>))
             // .add_systems(Update,(mapping_event_system::<M>,)
             )

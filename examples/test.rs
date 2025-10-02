@@ -1,6 +1,5 @@
 
 use std::collections::{HashMap, HashSet};
-
 use bevy::prelude::*;
 use bevy_axis_input::{self as axis_input, Binding,  };
 use serde::Deserialize;
@@ -13,7 +12,6 @@ pub enum Mapping {
     MenuCancel,
     MenuUp,
 }
-
 
 #[derive(Resource,Default)]
 struct Menu {
@@ -43,11 +41,10 @@ fn main() {
     app
         .add_plugins((
             DefaultPlugins
-                .set(AssetPlugin {watch_for_changes_override:Some(true), ..default() })
                 .set(WindowPlugin {
                     primary_window: Some(Window {
                         title: "some input map".into(),
-                        resolution: (800.0, 600.0).into(),
+                        resolution: (800, 600).into(),
                         resizable: true,
                         ..default()
                     }),
@@ -59,6 +56,7 @@ fn main() {
         .init_resource::<CurBinds>()
         .init_resource::<Menu>()
 
+        // .add_systems(Startup, (  text_test_setup,))
         .add_systems(Startup, ( setup_input, setup_camera, setup_menu, ))
         .add_systems(PreUpdate, ( update_input, ).after(axis_input::InputMapSystem))
         .add_systems(Update, ( show_menu, ))
@@ -66,6 +64,15 @@ fn main() {
 
     app.run();
 }
+// fn text_test_setup(mut commands: Commands, asset_server: Res<AssetServer>) {
+//     commands.spawn(Camera2d);
+//     commands.spawn((
+//         Text::new("hello\nbevy!"),
+//         TextFont { font: asset_server.load("FiraMono-Medium.ttf"), font_size: 67.0, ..default() },
+//         TextLayout::new_with_justify(Justify::Center),
+//         Node { position_type: PositionType::Absolute,  ..Default::default() },
+//     ));
+// }
 
 fn setup_input(
     mut input_map: ResMut<axis_input::InputMap<Mapping>>,
@@ -153,13 +160,13 @@ fn setup_input(
 // struct CurBindModeBinds(Vec<Binding>);
 
 fn update_input(
-    mut input_map_event: EventReader<axis_input::InputMapEvent<Mapping>>,
-    mut exit: EventWriter<AppExit>,
+    mut input_map_event: MessageReader<axis_input::InputMapEvent<Mapping>>,
+    mut exit: MessageWriter<AppExit>,
     mut menu : ResMut<Menu>,
     mut cur_binds : ResMut<CurBinds>,
     mut input_map: ResMut<axis_input::InputMap<Mapping>>,
 
-    // mut gamepad_events: EventReader<GamepadEvent>,
+    // mut gamepad_events: MessageReader<GamepadEvent>,
     mut commands: Commands,
 
 
@@ -335,9 +342,11 @@ fn update_input(
     }
 }
 
-fn setup_camera(mut commands: Commands) {
-    // commands.spawn((Camera2d,));
+fn setup_camera(
+    mut commands: Commands,
+) {
     commands.spawn(Camera3d::default());
+    // commands.spawn(Camera2d);
 }
 
 #[derive(Component)]
@@ -351,7 +360,7 @@ fn setup_menu(
 
     commands.spawn((
         Text::default(),
-        TextLayout::new_with_justify(JustifyText::Center),
+        TextLayout::new_with_justify(Justify::Center),
         Node {align_self:AlignSelf::Center,justify_self:JustifySelf::Center,..Default::default()},
     )).with_child((
         TextSpan::new("\"Press Up/Down to navigate, Enter to select, Escape to cancel/clear binding.\""),
@@ -399,7 +408,7 @@ fn show_menu(
 
     mut bind_mode_chain : Local<Vec<Binding>>,
 
-    mut input_map_event: EventReader<axis_input::InputMapEvent<Mapping>>,
+    mut input_map_event: MessageReader<axis_input::InputMapEvent<Mapping>>,
 ) {
 
     // let mut bind_mode_chain = Vec::new();

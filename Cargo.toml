@@ -4,12 +4,14 @@ version = "0.1.2"
 edition = "2021"
 
 [dependencies]
-bevy = { version = "0.16", default-features = false, features = [ "serialize", ] }
+bevy = { version = "0.17", default-features = false, features = [ "serialize", ] }
+
 serde = { version = "1.0", features = ["derive"] }
 ron = "0.8.1"
 
 [dev-dependencies]
-bevy = { version = "0.16", default-features = false, features = ["bevy_window","x11","bevy_asset","bevy_render","bevy_text","bevy_ui","bevy_gilrs"] }
+#bevy = { version = "0.17", default-features = false, features = ["bevy_window","x11","bevy_asset","bevy_render","bevy_text","bevy_ui","bevy_gilrs"] }
+bevy = { version = "0.17", default-features = true, features = [ "serialize", ] }
 
 [lib]
 name = "bevy_axis_input"

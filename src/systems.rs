@@ -83,16 +83,16 @@ fn is_binding_bind_mode(
 }
 
 pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug> (
-    mut gamepad_events: EventReader<GamepadEvent>,
-    mut key_events: EventReader<bevy::input::keyboard::KeyboardInput>,
-    mut mouse_move_events: EventReader<bevy::input::mouse::MouseMotion>,
-    mut mouse_scroll_events: EventReader<bevy::input::mouse::MouseWheel>,
-    mut mouse_button_events : EventReader<bevy::input::mouse::MouseButtonInput>,
+    mut gamepad_events: MessageReader<GamepadEvent>,
+    mut key_events: MessageReader<bevy::input::keyboard::KeyboardInput>,
+    mut mouse_move_events: MessageReader<bevy::input::mouse::MouseMotion>,
+    mut mouse_scroll_events: MessageReader<bevy::input::mouse::MouseWheel>,
+    mut mouse_button_events : MessageReader<bevy::input::mouse::MouseButtonInput>,
 
     mut gamepad_axis_lasts : Local<HashMap<(Device,GamepadAxis),f32>>,
     mut key_lasts : Local<HashSet<KeyCode>>,
 
-    mut binding_input_event_writer: EventWriter<BindingInputEvent>,
+    mut binding_input_event_writer: MessageWriter<BindingInputEvent>,
 
     gamepad_dead_zones_query: Query<& GamepadDeadZone>,
 ) {
@@ -305,9 +305,9 @@ pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug> (
 
 
 pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt::Debug> (
-    mut gamepad_events: EventReader<GamepadEvent>,
-    mut binding_input_events: EventReader<BindingInputEvent>,
-    mut mapping_event_writer: EventWriter<InputMapEvent<M>>,
+    mut gamepad_events: MessageReader<GamepadEvent>,
+    mut binding_input_events: MessageReader<BindingInputEvent>,
+    mut mapping_event_writer: MessageWriter<InputMapEvent<M>>,
 
     mut input_map : ResMut<InputMap<M>>,
     time: Res<bevy::time::Time>,
