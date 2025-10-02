@@ -18,7 +18,7 @@ use bevy::input::keyboard::KeyCode;
 use crate::{GamepadBindMode, GamepadDeadZone, GamepadOwner};
 
 use super::resources::*;
-use super::events::*;
+use super::messages::*;
 use super::values::*;
 
 fn use_dead_zone(value:f32,dead_zone:Option<&DeadZone>) -> f32 {
@@ -92,7 +92,7 @@ pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug> (
     mut gamepad_axis_lasts : Local<HashMap<(Device,GamepadAxis),f32>>,
     mut key_lasts : Local<HashSet<KeyCode>>,
 
-    mut binding_input_event_writer: MessageWriter<BindingInputEvent>,
+    mut binding_input_event_writer: MessageWriter<BindingInputMessage>,
 
     gamepad_dead_zones_query: Query<& GamepadDeadZone>,
 ) {
@@ -109,7 +109,7 @@ pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug> (
                 let dead_zone=gamepad_dead_zones_query.get(entity).ok().and_then(|dead_zones|dead_zones.0.get(&binding));
                 let value=use_dead_zone(*value,dead_zone);
 
-                binding_input_event_writer.write(BindingInputEvent { device, immediate, binding, value, });
+                binding_input_event_writer.write(BindingInputMessage { device, immediate, binding, value, });
             }
             GamepadEvent::Axis(GamepadAxisChangedEvent {value, entity, axis:axis_type })=> {
                 let entity=*entity;
@@ -120,19 +120,19 @@ pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug> (
                 let value=use_dead_zone(*value,dead_zone);
                 let last_value=gamepad_axis_lasts.get(&(device,axis_type)).cloned().unwrap_or_default();
 
-                binding_input_event_writer.write(BindingInputEvent { device, immediate, binding, value, });
+                binding_input_event_writer.write(BindingInputMessage { device, immediate, binding, value, });
 
                 //the "or" part is so to know if last val had been pos and cur val is <=0, so knows to send an event with val=0
                 if value>0.0 || last_value>0.0 && value <= 0.0 {
                     let value=value.max(0.0);
                     let binding=Binding::GamepadAxisPos(axis_type);
-                    binding_input_event_writer.write(BindingInputEvent { device, immediate, binding, value, });
+                    binding_input_event_writer.write(BindingInputMessage { device, immediate, binding, value, });
                 }
 
                 if value<0.0 || last_value<0.0 && value >= 0.0 {
                     let value=value.min(0.0).abs();
                     let binding=Binding::GamepadAxisNeg(axis_type);
-                    binding_input_event_writer.write(BindingInputEvent { device, immediate, binding, value, });
+                    binding_input_event_writer.write(BindingInputMessage { device, immediate, binding, value, });
                 }
 
                 //
@@ -151,7 +151,7 @@ pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug> (
                     let device=Device::Other;
                     let binding=Binding::Key(ev.key_code);
                     let value=1.0;
-                    binding_input_event_writer.write(BindingInputEvent { device, immediate, binding, value, });
+                    binding_input_event_writer.write(BindingInputMessage { device, immediate, binding, value, });
                     key_lasts.insert(ev.key_code);
                 }
             }
@@ -159,7 +159,7 @@ pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug> (
                 let device=Device::Other;
                 let value=0.0;
                 let binding=Binding::Key(ev.key_code);
-                binding_input_event_writer.write(BindingInputEvent { device, immediate, binding, value, });
+                binding_input_event_writer.write(BindingInputMessage { device, immediate, binding, value, });
                 key_lasts.remove(&ev.key_code); //may not exist, if there was somehow a release without a press
             }
         }
@@ -174,13 +174,13 @@ pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug> (
                 let device=Device::Other;
                 let binding=Binding::MouseButton(ev.button);
                 let value=1.0;
-                binding_input_event_writer.write(BindingInputEvent { device, immediate, binding, value, });
+                binding_input_event_writer.write(BindingInputMessage { device, immediate, binding, value, });
             }
             bevy::input::ButtonState::Released => {
                 let device=Device::Other;
                 let binding=Binding::MouseButton(ev.button);
                 let value=0.0;
-                binding_input_event_writer.write(BindingInputEvent { device, immediate, binding, value, });
+                binding_input_event_writer.write(BindingInputMessage { device, immediate, binding, value, });
             }
         }
     }
@@ -193,33 +193,33 @@ pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug> (
         if ev.delta.x!=0.0 {
             let binding=Binding::MouseMoveX;
             let value=ev.delta.x;
-            binding_input_event_writer.write(BindingInputEvent { device, immediate, binding, value, });
+            binding_input_event_writer.write(BindingInputMessage { device, immediate, binding, value, });
         }
         if ev.delta.x>0.0 {
             let binding=Binding::MouseMovePosX;
             let value=ev.delta.x;
-            binding_input_event_writer.write(BindingInputEvent { device, immediate, binding, value, });
+            binding_input_event_writer.write(BindingInputMessage { device, immediate, binding, value, });
         }
         if ev.delta.x<0.0 {
             let binding=Binding::MouseMoveNegX;
             let value=ev.delta.x;
-            binding_input_event_writer.write(BindingInputEvent { device, immediate, binding, value, });
+            binding_input_event_writer.write(BindingInputMessage { device, immediate, binding, value, });
         }
 
         if ev.delta.y!=0.0 {
             let binding=Binding::MouseMoveY;
             let value=ev.delta.y;
-            binding_input_event_writer.write(BindingInputEvent { device, immediate, binding, value, });
+            binding_input_event_writer.write(BindingInputMessage { device, immediate, binding, value, });
         }
         if ev.delta.y>0.0 {
             let binding=Binding::MouseMovePosY;
             let value=ev.delta.y;
-            binding_input_event_writer.write(BindingInputEvent { device, immediate, binding, value, });
+            binding_input_event_writer.write(BindingInputMessage { device, immediate, binding, value, });
         }
         if ev.delta.y<0.0 {
             let binding=Binding::MouseMoveNegY;
             let value=ev.delta.y;
-            binding_input_event_writer.write(BindingInputEvent { device, immediate, binding, value, });
+            binding_input_event_writer.write(BindingInputMessage { device, immediate, binding, value, });
         }
     }
 
@@ -233,33 +233,33 @@ pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug> (
                 if ev.x!=0.0 {
                     let binding=Binding::MouseScrollLineX;
                     let value=ev.x;
-                    binding_input_event_writer.write(BindingInputEvent { device, immediate, binding, value, });
+                    binding_input_event_writer.write(BindingInputMessage { device, immediate, binding, value, });
                 }
                 if ev.x>0.0 {
                     let binding=Binding::MouseScrollLinePosX;
                     let value=ev.x;
-                    binding_input_event_writer.write(BindingInputEvent { device, immediate, binding, value, });
+                    binding_input_event_writer.write(BindingInputMessage { device, immediate, binding, value, });
                 }
                 if ev.x<0.0 {
                     let binding=Binding::MouseScrollLineNegX;
                     let value=ev.x;
-                    binding_input_event_writer.write(BindingInputEvent { device, immediate, binding, value, });
+                    binding_input_event_writer.write(BindingInputMessage { device, immediate, binding, value, });
                 }
 
                 if ev.y!=0.0 {
                     let binding=Binding::MouseScrollLineY;
                     let value=ev.y;
-                    binding_input_event_writer.write(BindingInputEvent { device, immediate, binding, value, });
+                    binding_input_event_writer.write(BindingInputMessage { device, immediate, binding, value, });
                 }
                 if ev.y>0.0 {
                     let binding=Binding::MouseScrollLinePosY;
                     let value=ev.y;
-                    binding_input_event_writer.write(BindingInputEvent { device, immediate, binding, value, });
+                    binding_input_event_writer.write(BindingInputMessage { device, immediate, binding, value, });
                 }
                 if ev.y<0.0 {
                     let binding=Binding::MouseScrollLineNegY;
                     let value=ev.y;
-                    binding_input_event_writer.write(BindingInputEvent { device, immediate, binding, value, });
+                    binding_input_event_writer.write(BindingInputMessage { device, immediate, binding, value, });
                 }
             }
             bevy::input::mouse::MouseScrollUnit::Pixel => {
@@ -267,33 +267,33 @@ pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug> (
                 if ev.x!=0.0 {
                     let binding=Binding::MouseScrollPixelX;
                     let value=ev.x;
-                    binding_input_event_writer.write(BindingInputEvent { device, immediate, binding, value, });
+                    binding_input_event_writer.write(BindingInputMessage { device, immediate, binding, value, });
                 }
                 if ev.x>0.0 {
                     let binding=Binding::MouseScrollPixelPosX;
                     let value=ev.x;
-                    binding_input_event_writer.write(BindingInputEvent { device, immediate, binding, value, });
+                    binding_input_event_writer.write(BindingInputMessage { device, immediate, binding, value, });
                 }
                 if ev.x<0.0 {
                     let binding=Binding::MouseScrollPixelNegX;
                     let value=ev.x;
-                    binding_input_event_writer.write(BindingInputEvent { device, immediate, binding, value, });
+                    binding_input_event_writer.write(BindingInputMessage { device, immediate, binding, value, });
                 }
 
                 if ev.y!=0.0 {
                     let binding=Binding::MouseScrollPixelY;
                     let value=ev.y;
-                    binding_input_event_writer.write(BindingInputEvent { device, immediate, binding, value, });
+                    binding_input_event_writer.write(BindingInputMessage { device, immediate, binding, value, });
                 }
                 if ev.y>0.0 {
                     let binding=Binding::MouseScrollPixelPosY;
                     let value=ev.y;
-                    binding_input_event_writer.write(BindingInputEvent { device, immediate, binding, value, });
+                    binding_input_event_writer.write(BindingInputMessage { device, immediate, binding, value, });
                 }
                 if ev.y<0.0 {
                     let binding=Binding::MouseScrollPixelNegY;
                     let value=ev.y;
-                    binding_input_event_writer.write(BindingInputEvent { device, immediate, binding, value, });
+                    binding_input_event_writer.write(BindingInputMessage { device, immediate, binding, value, });
                 }
             }
         }
@@ -306,8 +306,8 @@ pub fn binding_inputs_system<M: Send + Sync + 'static + Eq + Debug> (
 
 pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt::Debug> (
     mut gamepad_events: MessageReader<GamepadEvent>,
-    mut binding_input_events: MessageReader<BindingInputEvent>,
-    mut mapping_event_writer: MessageWriter<InputMapEvent<M>>,
+    mut binding_input_events: MessageReader<BindingInputMessage>,
+    mut mapping_event_writer: MessageWriter<InputMapMessage<M>>,
 
     mut input_map : ResMut<InputMap<M>>,
     time: Res<bevy::time::Time>,
@@ -686,11 +686,11 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
             let last_dir=if last_val>0.0{1}else if last_val<0.0{-1}else{0};
 
             if last_val!=0.0 {
-                mapping_event_writer.write(InputMapEvent::ValueChanged { mapping: mapping.clone(), val: 0.0, owner });
+                mapping_event_writer.write(InputMapMessage::ValueChanged { mapping: mapping.clone(), val: 0.0, owner });
             }
 
             if last_val==0.0 {
-                mapping_event_writer.write(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: last_dir, owner });
+                mapping_event_writer.write(InputMapMessage::JustReleased { mapping: mapping.clone(), dir: last_dir, owner });
             }
         } else {
             let Some(mapping_vals)=owner_mappings.get(&owner) else {
@@ -710,14 +710,14 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                 let cur_dir=if cur_val>0.0{1}else if cur_val<0.0{-1}else{0};
 
                 if last_val!=cur_val {
-                    mapping_event_writer.write(InputMapEvent::ValueChanged { mapping: mapping.clone(), val: cur_val, owner });
+                    mapping_event_writer.write(InputMapMessage::ValueChanged { mapping: mapping.clone(), val: cur_val, owner });
                 }
 
                 if cur_dir!=last_dir {
-                    mapping_event_writer.write(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: last_dir, owner });
+                    mapping_event_writer.write(InputMapMessage::JustReleased { mapping: mapping.clone(), dir: last_dir, owner });
 
                     if cur_val!=0.0 {
-                        mapping_event_writer.write(InputMapEvent::JustPressed { mapping: mapping.clone(), dir: cur_dir, owner });
+                        mapping_event_writer.write(InputMapMessage::JustPressed { mapping: mapping.clone(), dir: cur_dir, owner });
                     }
                 }
             }
@@ -858,7 +858,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                     let cur_dir=if cur_val>0.0{1}else if cur_val<0.0{-1}else{0};
 
                     //
-                    mapping_event_writer.write(InputMapEvent::TempValueChanged { mapping: mapping.clone(), val: cur_val, owner });
+                    mapping_event_writer.write(InputMapMessage::TempValueChanged { mapping: mapping.clone(), val: cur_val, owner });
 
                     //reset repeating
                     if mapping_repeats.contains_key(&mapping) {
@@ -867,16 +867,16 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
                     //send press/release events (cur_dir will never be 0)
                     if last_dir==cur_dir || last_dir!=0 { //(last_dir!=cur_dir && last_dir!=0)
-                        mapping_event_writer.write(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: last_dir, owner }); //0
+                        mapping_event_writer.write(InputMapMessage::JustReleased { mapping: mapping.clone(), dir: last_dir, owner }); //0
                     }
 
                     if last_dir==0 || last_dir!=cur_dir { //(last_dir!=cur_dir && last_dir!=0)
-                        mapping_event_writer.write(InputMapEvent::JustPressed{ mapping:mapping.clone(), dir: cur_dir, owner }); //1
-                        mapping_event_writer.write(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: cur_dir, owner }); //2
+                        mapping_event_writer.write(InputMapMessage::JustPressed{ mapping:mapping.clone(), dir: cur_dir, owner }); //1
+                        mapping_event_writer.write(InputMapMessage::JustReleased { mapping: mapping.clone(), dir: cur_dir, owner }); //2
                     }
 
                     if last_dir==cur_dir || last_dir!=0 {
-                        mapping_event_writer.write(InputMapEvent::JustPressed { mapping: mapping.clone(), dir: last_dir, owner }); //3
+                        mapping_event_writer.write(InputMapMessage::JustPressed { mapping: mapping.clone(), dir: last_dir, owner }); //3
                     }
                 } else {
                     //binding input val
@@ -891,18 +891,18 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
 
                     //change event
                     if last_val!=cur_val {
-                        mapping_event_writer.write(InputMapEvent::ValueChanged { mapping: mapping.clone(), val: cur_val, owner });
+                        mapping_event_writer.write(InputMapMessage::ValueChanged { mapping: mapping.clone(), val: cur_val, owner });
                     }
 
                     //
                     if last_dir!=cur_dir {
                         //send press/release event
                         if cur_dir==0 || last_dir!=0 {
-                            mapping_event_writer.write(InputMapEvent::JustReleased { mapping: mapping.clone(), dir: last_dir, owner });
+                            mapping_event_writer.write(InputMapMessage::JustReleased { mapping: mapping.clone(), dir: last_dir, owner });
                         }
 
                         if last_dir==0 || cur_dir!=0 {
-                            mapping_event_writer.write(InputMapEvent::JustPressed { mapping: mapping.clone(), dir: cur_dir, owner });
+                            mapping_event_writer.write(InputMapMessage::JustPressed { mapping: mapping.clone(), dir: cur_dir, owner });
                         }
 
                         //reset repeating
@@ -938,7 +938,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                 mapping_val.repeat_time_accum+=time.delta_secs();
 
                 if mapping_val.repeat_time_accum>=duration {
-                    mapping_event_writer.write(InputMapEvent::Repeat {
+                    mapping_event_writer.write(InputMapMessage::Repeat {
                         mapping: mapping.clone(),
                         dir: cur_dir,
                         delay: duration,
@@ -980,7 +980,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
             let chain_bindings=bind_mode_chain.entry(binding_input.device).or_default();
             chain_bindings.push(binding_input.binding);
 
-            mapping_event_writer.write(InputMapEvent::BindPressed{
+            mapping_event_writer.write(InputMapMessage::BindPressed{
                 // owner,
                 device:binding_input.device,
                 bindings:chain_bindings.clone(),
@@ -993,7 +993,7 @@ pub fn mapping_event_system<M: Send + Sync + 'static + Eq + Hash+Clone+core::fmt
                 bind_mode_bindings.remove(&(binding_input.device,binding));
             }
 
-            mapping_event_writer.write(InputMapEvent::BindReleased{
+            mapping_event_writer.write(InputMapMessage::BindReleased{
                 // owner,
                 device:binding_input.device,
                 bindings:chain_bindings,

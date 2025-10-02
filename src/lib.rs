@@ -39,13 +39,13 @@ TODO
 mod resources;
 mod systems;
 mod values;
-mod events;
+mod messages;
 mod plugin;
 mod components;
 
 pub use resources::*;
 pub use values::*;
-pub use events::*;
+pub use messages::*;
 pub use components::*;
 
 pub use plugin::*;

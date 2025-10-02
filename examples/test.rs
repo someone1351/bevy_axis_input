@@ -160,7 +160,7 @@ fn setup_input(
 // struct CurBindModeBinds(Vec<Binding>);
 
 fn update_input(
-    mut input_map_event: MessageReader<axis_input::InputMapEvent<Mapping>>,
+    mut input_map_event: MessageReader<axis_input::InputMapMessage<Mapping>>,
     mut exit: MessageWriter<AppExit>,
     mut menu : ResMut<Menu>,
     mut cur_binds : ResMut<CurBinds>,
@@ -206,17 +206,17 @@ fn update_input(
             // axis_input::InputMapEvent::GamepadDisconnect { entity, index, name, vendor_id, product_id } => {
             //     println!("Gamepad disconnected: {entity} {index} {name:?} {vendor_id:?} {product_id:?}");
             // }
-            axis_input::InputMapEvent::ValueChanged { mapping:Mapping::X, val, .. } => {
+            axis_input::InputMapMessage::ValueChanged { mapping:Mapping::X, val, .. } => {
                 menu.x_val=val;
             }
-            axis_input::InputMapEvent::ValueChanged { mapping:Mapping::Y, val, .. } => {
+            axis_input::InputMapMessage::ValueChanged { mapping:Mapping::Y, val, .. } => {
                 menu.y_val=val;
             }
-            axis_input::InputMapEvent::JustPressed{mapping:Mapping::Quit, ..} => {
+            axis_input::InputMapMessage::JustPressed{mapping:Mapping::Quit, ..} => {
                 exit.write(AppExit::Success);
             }
-            axis_input::InputMapEvent::JustPressed{mapping:Mapping::MenuUp, dir, ..}
-                |axis_input::InputMapEvent::Repeat { mapping:Mapping::MenuUp, dir, .. }
+            axis_input::InputMapMessage::JustPressed{mapping:Mapping::MenuUp, dir, ..}
+                |axis_input::InputMapMessage::Repeat { mapping:Mapping::MenuUp, dir, .. }
                 if !menu.in_bind_mode
             => {
                 menu.cur_index-=dir;
@@ -225,10 +225,10 @@ fn update_input(
                 if menu.cur_index==n {menu.cur_index=0;}
                 menu.pressed=None;
             }
-            axis_input::InputMapEvent::JustPressed{mapping:Mapping::MenuSelect, ..} => {
+            axis_input::InputMapMessage::JustPressed{mapping:Mapping::MenuSelect, ..} => {
                 menu.pressed=Some(menu.cur_index);
             }
-            axis_input::InputMapEvent::JustReleased{mapping:Mapping::MenuSelect, ..} => {
+            axis_input::InputMapMessage::JustReleased{mapping:Mapping::MenuSelect, ..} => {
                 if let Some(pressed)=menu.pressed {
                     match pressed {
                         0..=2 => { //X+ X- Y
@@ -257,9 +257,9 @@ fn update_input(
                 menu.pressed=None;
             }
 
-            axis_input::InputMapEvent::BindPressed { .. } => {
+            axis_input::InputMapMessage::BindPressed { .. } => {
             }
-            axis_input::InputMapEvent::BindReleased {  bindings, .. } => {
+            axis_input::InputMapMessage::BindReleased {  bindings, .. } => {
                 // input_map.set_bind_mode_devices([]);
                 // input_map.bind_mode_devices.clear(); //todo!
 
@@ -299,7 +299,7 @@ fn update_input(
                 input_map.bindings_updated=true;
 
             }
-            axis_input::InputMapEvent::JustPressed{mapping:Mapping::MenuCancel, ..} => {
+            axis_input::InputMapMessage::JustPressed{mapping:Mapping::MenuCancel, ..} => {
                 if menu.in_bind_mode {
                     // input_map.set_bind_mode_devices([]);
                     // input_map.bind_mode_devices.clear(); //todo!
@@ -408,16 +408,16 @@ fn show_menu(
 
     mut bind_mode_chain : Local<Vec<Binding>>,
 
-    mut input_map_event: MessageReader<axis_input::InputMapEvent<Mapping>>,
+    mut input_map_event: MessageReader<axis_input::InputMapMessage<Mapping>>,
 ) {
 
     // let mut bind_mode_chain = Vec::new();
     for ev in input_map_event.read() {
         match ev.clone() {
-            axis_input::InputMapEvent::BindPressed {  bindings, .. } => {
+            axis_input::InputMapMessage::BindPressed {  bindings, .. } => {
                 *bind_mode_chain=bindings;
             }
-            axis_input::InputMapEvent::BindReleased {   .. } => {
+            axis_input::InputMapMessage::BindReleased {   .. } => {
                 bind_mode_chain.clear();
             }
             _=>{}

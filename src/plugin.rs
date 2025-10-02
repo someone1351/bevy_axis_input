@@ -1,12 +1,13 @@
 
 use bevy::ecs::prelude::*;
+use bevy::input::InputSystems;
 
 
 use super::systems::*;
 use super::resources::*;
 
 // use super::binding::*;
-use super::events::*;
+use super::messages::*;
 
 
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
@@ -28,13 +29,13 @@ where
     fn build(&self, app: &mut bevy::app::App) {
         app
             .init_resource::<InputMap<M>>()
-            .add_message::<InputMapEvent<M>>()
-            .add_message::<BindingInputEvent>()
+            .add_message::<InputMapMessage<M>>()
+            .add_message::<BindingInputMessage>()
 
             .add_systems(bevy::app::PreUpdate, (
                 binding_inputs_system::<M>,
                 mapping_event_system::<M>,
-            ).chain().in_set(InputMapSystem)//.after(InputSystem)
+            ).chain().in_set(InputMapSystem).after(InputSystems)
             // .before(mapping_event_system::<M>))
             // .add_systems(Update,(mapping_event_system::<M>,)
             )
