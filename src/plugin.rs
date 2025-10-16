@@ -11,7 +11,7 @@ use super::messages::*;
 
 
 #[derive(SystemSet, Debug, Clone, PartialEq, Eq, Hash)]
-pub struct InputMapSystem;
+pub struct InputMapSystems;
 
 pub struct InputMapPlugin<M : 'static>(std::marker::PhantomData<&'static M>);
 
@@ -35,7 +35,7 @@ where
             .add_systems(bevy::app::PreUpdate, (
                 binding_inputs_system::<M>,
                 mapping_event_system::<M>,
-            ).chain().in_set(InputMapSystem).after(InputSystems)
+            ).chain().in_set(InputMapSystems).after(InputSystems)
             // .before(mapping_event_system::<M>))
             // .add_systems(Update,(mapping_event_system::<M>,)
             )
